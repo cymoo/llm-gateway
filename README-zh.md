@@ -73,8 +73,9 @@ npm run dev
 
 ## 默认管理员初始化说明（seed）
 
-管理员并不是在启动时立即创建，而是由 `src/lib/db/seed.ts` 在首次请求以下接口时触发：
+管理员并不是在启动时立即创建，而是由 `src/lib/db/seed.ts` 在首次请求以下任一接口时触发：
 
+- `POST /api/admin/auth/login`
 - `POST /api/v1/chat/completions`
 
 仅当以下三个环境变量都存在时才会尝试创建：

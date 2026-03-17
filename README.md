@@ -91,8 +91,9 @@ Default URL: `http://localhost:3000`
 
 ## Admin Seed Behavior
 
-The initial admin is not created on startup. It is lazily seeded when:
+The initial admin is not created on startup. It is lazily seeded when the first request hits either:
 
+- `POST /api/admin/auth/login`
 - `POST /api/v1/chat/completions`
 
 Seed is attempted only when all three variables are set:
