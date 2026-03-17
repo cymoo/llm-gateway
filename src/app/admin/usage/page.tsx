@@ -61,6 +61,12 @@ function formatNum(n: number): string {
   return n.toString();
 }
 
+function formatTooltipNumber(value: unknown): string {
+  const raw = Array.isArray(value) ? (value.length > 0 ? value[0] : null) : value;
+  const num = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(num) ? formatNum(num) : "N/A";
+}
+
 function getDefaultRange() {
   const end = new Date();
   const start = new Date();
@@ -182,7 +188,7 @@ export default function UsagePage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="userName" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
-                      <Tooltip formatter={(v: number) => formatNum(v)} />
+                      <Tooltip formatter={(v) => formatTooltipNumber(v)} />
                       <Bar dataKey="totalTokens" fill="hsl(221.2, 83.2%, 53.3%)" />
                     </BarChart>
                   </ResponsiveContainer>
@@ -241,7 +247,7 @@ export default function UsagePage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="modelAlias" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
-                      <Tooltip formatter={(v: number) => formatNum(v)} />
+                      <Tooltip formatter={(v) => formatTooltipNumber(v)} />
                       <Bar dataKey="totalTokens" fill="hsl(25, 95%, 53%)" />
                     </BarChart>
                   </ResponsiveContainer>
