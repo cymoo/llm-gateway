@@ -4,8 +4,11 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { signJWT } from "@/lib/auth/jwt";
 import bcrypt from "bcryptjs";
+import { seedAdmin } from "@/lib/db/seed";
 
 export async function POST(req: NextRequest) {
+  await seedAdmin();
+
   const { email, password } = await req.json();
 
   if (!email || !password) {
