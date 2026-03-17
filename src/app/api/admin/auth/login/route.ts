@@ -6,13 +6,8 @@ import { signJWT } from "@/lib/auth/jwt";
 import bcrypt from "bcryptjs";
 import { seedAdmin } from "@/lib/db/seed";
 
-let seeded = false;
-
 export async function POST(req: NextRequest) {
-  if (!seeded) {
-    await seedAdmin();
-    seeded = true;
-  }
+  await seedAdmin();
 
   const { email, password } = await req.json();
 
