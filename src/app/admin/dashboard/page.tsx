@@ -73,9 +73,9 @@ function formatNum(n: number): string {
 }
 
 function formatTooltipNumber(value: unknown): string {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw = Array.isArray(value) ? (value.length > 0 ? value[0] : null) : value;
   const num = typeof raw === "number" ? raw : Number(raw);
-  return formatNum(Number.isFinite(num) ? num : 0);
+  return Number.isFinite(num) ? formatNum(num) : "N/A";
 }
 
 export default function DashboardPage() {
