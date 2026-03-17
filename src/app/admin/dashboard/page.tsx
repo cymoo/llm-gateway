@@ -72,6 +72,12 @@ function formatNum(n: number): string {
   return n.toString();
 }
 
+function formatTooltipNumber(value: unknown): string {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const num = typeof raw === "number" ? raw : Number(raw);
+  return formatNum(Number.isFinite(num) ? num : 0);
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,7 +156,7 @@ export default function DashboardPage() {
                 />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value: number) => [formatNum(value), "Requests"]}
+                  formatter={(value) => [formatTooltipNumber(value), "Requests"]}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
                 <Line
@@ -183,7 +189,7 @@ export default function DashboardPage() {
                 />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={formatNum} />
                 <Tooltip
-                  formatter={(value: number) => [formatNum(value), "Tokens"]}
+                  formatter={(value) => [formatTooltipNumber(value), "Tokens"]}
                   labelFormatter={(l) => `Date: ${l}`}
                 />
                 <Line
