@@ -56,13 +56,24 @@ export default function UsersPage() {
         ...(search ? { search } : {}),
       });
       const res = await fetch(`/api/admin/users?${params}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        throw new Error(data?.error || "Failed to fetch users");
+      }
       setUsers(data.data);
       setTotal(data.total);
+    } catch (err) {
+      setUsers([]);
+      setTotal(0);
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to fetch users",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, search, toast]);
 
   useEffect(() => {
     fetchUsers();

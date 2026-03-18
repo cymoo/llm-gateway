@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { users, userModels, dailyUsage } from "@/lib/db/schema";
-import { eq, ilike, or, count, sql, and } from "drizzle-orm";
+import { eq, ilike, or, count, sql, and, inArray } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 import { generateApiKey } from "@/lib/utils/api-key";
 
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
         .where(
           userIds.length === 1
             ? eq(userModels.userId, userIds[0])
-            : sql`${userModels.userId} = ANY(${userIds})`
+            : inArray(userModels.userId, userIds)
         )
         .groupBy(userModels.userId)
     : [];
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
             eq(dailyUsage.date, today),
             userIds.length === 1
               ? eq(dailyUsage.userId, userIds[0])
-              : sql`${dailyUsage.userId} = ANY(${userIds})`
+              : inArray(dailyUsage.userId, userIds)
           )
         )
         .groupBy(dailyUsage.userId)
