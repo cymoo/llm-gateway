@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Pencil, Trash2, RefreshCw, Eye, EyeOff, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, RefreshCw, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import { copyToClipboard } from "@/lib/utils/clipboard";
 
 interface User {
   id: string;
@@ -43,7 +44,6 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   const limit = 20;
 
@@ -67,7 +67,8 @@ export default function UsersPage() {
       setTotal(0);
       toast({
         title: "Error",
-        description: err instanceof Error ? err.message : "Failed to fetch users",
+        description:
+          err instanceof Error ? err.message : "Failed to fetch users",
         variant: "destructive",
       });
     } finally {
@@ -86,7 +87,8 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete user "${name}"? This action cannot be undone.`)) return;
+    if (!confirm(`Delete user "${name}"? This action cannot be undone.`))
+      return;
     const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "User deleted" });
@@ -98,7 +100,9 @@ export default function UsersPage() {
   };
 
   const handleRegenerateKey = async (id: string) => {
-    if (!confirm("Regenerate API key? The old key will stop working immediately."))
+    if (
+      !confirm("Regenerate API key? The old key will stop working immediately.")
+    )
       return;
     const res = await fetch(`/api/admin/users/${id}/regenerate-key`, {
       method: "POST",
@@ -109,34 +113,12 @@ export default function UsersPage() {
     }
   };
 
-  const toggleKeyVisibility = (id: string) => {
-    setVisibleKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   const handleCopyKey = async (apiKey: string) => {
-    if (!navigator.clipboard?.writeText) {
-      toast({
-        title: "Error",
-        description: "Clipboard API is not available in this browser context",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(apiKey);
-      toast({ title: "API key copied" });
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to copy API key",
-        variant: "destructive",
-      });
-    }
+    const ok = await copyToClipboard(apiKey);
+    toast({
+      title: ok ? "API key copied" : "Failed to copy API key",
+      variant: ok ? "default" : "destructive",
+    });
   };
 
   const totalPages = Math.ceil(total / limit);
@@ -189,13 +171,19 @@ export default function UsersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                <TableCell
+                  colSpan={7}
+                  className="text-center py-8 text-[hsl(var(--muted-foreground))]"
+                >
                   Loading...
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                <TableCell
+                  colSpan={7}
+                  className="text-center py-8 text-[hsl(var(--muted-foreground))]"
+                >
                   No users found
                 </TableCell>
               </TableRow>
@@ -218,40 +206,26 @@ export default function UsersPage() {
                   <TableCell>
                     <div className="flex items-center gap-1">
                       <code className="text-xs bg-[hsl(var(--muted))] px-2 py-1 rounded font-mono max-w-[200px] truncate">
-                        {visibleKeys.has(user.id)
-                          ? user.apiKey
-                          : user.apiKey.slice(0, 8) + "••••••••"}
+                        {user.apiKey.slice(0, 8) + "••••••••"}
                       </code>
-                       <button
-                         onClick={() => toggleKeyVisibility(user.id)}
-                         className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                         title="Show/hide API key"
-                       >
-                         {visibleKeys.has(user.id) ? (
-                           <EyeOff className="h-3.5 w-3.5" />
-                         ) : (
-                           <Eye className="h-3.5 w-3.5" />
-                         )}
-                       </button>
-                       <button
-                         onClick={() => handleCopyKey(user.apiKey)}
-                         className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                         title="Copy API key"
-                       >
-                         <Copy className="h-3.5 w-3.5" />
-                       </button>
-                     </div>
-                   </TableCell>
+                      <button
+                        onClick={() => handleCopyKey(user.apiKey)}
+                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                        title="Copy API key"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={user.isActive ? "default" : "secondary"}
-                    >
+                    <Badge variant={user.isActive ? "default" : "secondary"}>
                       {user.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell>{user.modelCount}</TableCell>
                   <TableCell className="text-sm text-[hsl(var(--muted-foreground))]">
-                    {formatNum(user.todayRequests)} req / {formatNum(user.todayTokens)} tok
+                    {formatNum(user.todayRequests)} req /{" "}
+                    {formatNum(user.todayTokens)} tok
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
