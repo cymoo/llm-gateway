@@ -119,6 +119,14 @@ export default function UsersPage() {
   };
 
   const handleCopyKey = async (apiKey: string) => {
+    if (!navigator.clipboard?.writeText) {
+      toast({
+        title: "Error",
+        description: "Clipboard API is not available in this browser context",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await navigator.clipboard.writeText(apiKey);
       toast({ title: "API key copied" });

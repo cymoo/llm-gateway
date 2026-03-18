@@ -25,8 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-
-const ADMIN_PASSWORD_PATTERN = /^[\x21-\x7e]+$/;
+import { validateAdminPassword } from "@/lib/utils/validators";
 
 interface UserData {
   id: string;
@@ -113,10 +112,7 @@ export default function UserDetailPage() {
       });
       return;
     }
-    if (
-      password &&
-      (password.length < 8 || password.length > 128 || !ADMIN_PASSWORD_PATTERN.test(password))
-    ) {
+    if (password && !validateAdminPassword(password)) {
       toast({
         title: "Error",
         description:
