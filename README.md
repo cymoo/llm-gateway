@@ -118,17 +118,7 @@ npm run start
 
 This project now includes API route tests using Vitest.
 
-1. Create/update test environment values in `.env.test`:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/llm_gateway_test
-JWT_SECRET=test-jwt-secret
-ADMIN_EMAIL=admin@example.com
-ADMIN_NAME=System Admin
-ADMIN_PASSWORD=ChangeMe123!
-```
-
-2. Run API tests:
+Run API tests:
 
 ```bash
 npm run test
