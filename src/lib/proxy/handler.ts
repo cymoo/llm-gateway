@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { users, models, userModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { makeProxyError } from "./errors";
+import { makeProxyError, normalizeBackendError } from "./errors";
 import { checkQuota } from "@/lib/quota/checker";
 import { recordUsage } from "@/lib/usage/recorder";
 import { createStreamTransformer } from "./stream";
@@ -162,6 +162,25 @@ export async function handleProxy(
     });
 
     clearTimeout(timeoutId);
+
+    if (!backendResponse.ok) {
+      const backendErrorText = await backendResponse.text();
+      const normalizedError = normalizeBackendError(
+        backendErrorText,
+        backendResponse.status
+      );
+      if (normalizedError) {
+        return normalizedError;
+      }
+
+      return new Response(backendErrorText, {
+        status: backendResponse.status,
+        headers: {
+          "Content-Type":
+            backendResponse.headers.get("content-type") || "application/json",
+        },
+      });
+    }
 
     if (isStream) {
       // Stream response

@@ -17,6 +17,14 @@ export type ProxyErrorCode =
   | "backend_unavailable"
   | "backend_timeout";
 
+interface BackendErrorPayload {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+  };
+}
+
 export function makeProxyError(
   message: string,
   type: ProxyErrorType,
@@ -32,4 +40,66 @@ export function makeProxyError(
       headers: { "Content-Type": "application/json" },
     }
   );
+}
+
+export function normalizeBackendError(
+  responseText: string,
+  status: number
+): Response | null {
+  let payload: BackendErrorPayload;
+  try {
+    payload = JSON.parse(responseText) as BackendErrorPayload;
+  } catch {
+    return null;
+  }
+
+  const error = payload.error;
+  if (!error?.message) {
+    return null;
+  }
+
+  const message = error.message.toLowerCase();
+  const code = error.code?.toLowerCase() ?? "";
+  const type = error.type?.toLowerCase() ?? "";
+
+  if (
+    code === "insufficient_quota" ||
+    (message.includes("quota") && message.includes("exceed"))
+  ) {
+    return makeProxyError(
+      "Upstream model service quota exceeded. Please try again later.",
+      "rate_limit_error",
+      "rate_limit_exceeded",
+      429
+    );
+  }
+
+  if (
+    status === 429 ||
+    code === "rate_limit_exceeded" ||
+    message.includes("rate limit")
+  ) {
+    return makeProxyError(
+      "Upstream model service is rate limited. Please try again later.",
+      "rate_limit_error",
+      "rate_limit_exceeded",
+      429
+    );
+  }
+
+  if (
+    (status === 401 || status === 403) &&
+    (code === "invalid_api_key" ||
+      type === "authentication_error" ||
+      message.includes("invalid api key"))
+  ) {
+    return makeProxyError(
+      "Upstream model service authentication failed. Please contact administrator.",
+      "server_error",
+      "backend_unavailable",
+      502
+    );
+  }
+
+  return null;
 }
