@@ -43,10 +43,10 @@ export async function POST(req: NextRequest) {
 
   if (!validateModelAlias(alias)) {
     return Response.json(
-      {
-        error:
-          "Invalid alias: must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ and be 1-100 chars",
-      },
+        {
+          error:
+          "Invalid alias: must match ^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$ and be 1-100 chars",
+        },
       { status: 400 }
     );
   }

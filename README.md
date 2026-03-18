@@ -109,6 +109,27 @@ If an admin user already exists (`is_admin=true`), no duplicate admin will be cr
 ```bash
 npm run dev
 npm run lint
+npm run test
 npm run build
 npm run start
+```
+
+## Testing
+
+This project now includes API route tests using Vitest.
+
+1. Create/update test environment values in `.env.test`:
+
+```env
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/llm_gateway_test
+JWT_SECRET=test-jwt-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_NAME=System Admin
+ADMIN_PASSWORD=ChangeMe123!
+```
+
+2. Run API tests:
+
+```bash
+npm run test
 ```

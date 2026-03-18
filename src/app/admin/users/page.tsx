@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Pencil, Trash2, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, RefreshCw, Eye, EyeOff, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +118,27 @@ export default function UsersPage() {
     });
   };
 
+  const handleCopyKey = async (apiKey: string) => {
+    if (!navigator.clipboard?.writeText) {
+      toast({
+        title: "Error",
+        description: "Clipboard API is not available in this browser context",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      toast({ title: "API key copied" });
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to copy API key",
+        variant: "destructive",
+      });
+    }
+  };
+
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -201,18 +222,26 @@ export default function UsersPage() {
                           ? user.apiKey
                           : user.apiKey.slice(0, 8) + "••••••••"}
                       </code>
-                      <button
-                        onClick={() => toggleKeyVisibility(user.id)}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-                      >
-                        {visibleKeys.has(user.id) ? (
-                          <EyeOff className="h-3.5 w-3.5" />
-                        ) : (
-                          <Eye className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </TableCell>
+                       <button
+                         onClick={() => toggleKeyVisibility(user.id)}
+                         className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                         title="Show/hide API key"
+                       >
+                         {visibleKeys.has(user.id) ? (
+                           <EyeOff className="h-3.5 w-3.5" />
+                         ) : (
+                           <Eye className="h-3.5 w-3.5" />
+                         )}
+                       </button>
+                       <button
+                         onClick={() => handleCopyKey(user.apiKey)}
+                         className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                         title="Copy API key"
+                       >
+                         <Copy className="h-3.5 w-3.5" />
+                       </button>
+                     </div>
+                   </TableCell>
                   <TableCell>
                     <Badge
                       variant={user.isActive ? "default" : "secondary"}

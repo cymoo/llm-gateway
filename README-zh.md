@@ -91,6 +91,27 @@ npm run dev
 ```bash
 npm run dev
 npm run lint
+npm run test
 npm run build
 npm run start
+```
+
+## 测试说明
+
+项目已增加基于 Vitest 的 API 路由测试。
+
+1. 在 `.env.test` 中配置测试环境变量：
+
+```env
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/llm_gateway_test
+JWT_SECRET=test-jwt-secret
+ADMIN_EMAIL=admin@example.com
+ADMIN_NAME=System Admin
+ADMIN_PASSWORD=ChangeMe123!
+```
+
+2. 运行测试：
+
+```bash
+npm run test
 ```
