@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, RefreshCw, Trash2, Plus, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -26,6 +25,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+
+const ADMIN_PASSWORD_PATTERN = /^[\x21-\x7e]+$/;
 
 interface UserData {
   id: string;
@@ -60,7 +61,6 @@ interface AvailableModel {
 
 export default function UserDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const { toast } = useToast();
   const userId = params.id as string;
 
@@ -70,6 +70,8 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [password, setPassword] = useState("");
+  const [initialIsAdmin, setInitialIsAdmin] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState("");
   const [editingQuota, setEditingQuota] = useState<string | null>(null);
   const [quotaForm, setQuotaForm] = useState<Record<string, string>>({});
@@ -82,7 +84,11 @@ export default function UserDetailPage() {
         fetch(`/api/admin/users/${userId}/models`),
         fetch("/api/admin/models"),
       ]);
-      if (userRes.ok) setUser(await userRes.json());
+      if (userRes.ok) {
+        const userData = await userRes.json();
+        setUser(userData);
+        setInitialIsAdmin(userData.isAdmin);
+      }
       if (authRes.ok) setAuthModels(await authRes.json());
       if (modelsRes.ok) {
         const all = await modelsRes.json();
@@ -99,15 +105,44 @@ export default function UserDetailPage() {
 
   const handleSaveUser = async () => {
     if (!user) return;
+    if (user.isAdmin && !initialIsAdmin && !password) {
+      toast({
+        title: "Error",
+        description: "Password is required when enabling admin access",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (
+      password &&
+      (password.length < 8 || password.length > 128 || !ADMIN_PASSWORD_PATTERN.test(password))
+    ) {
+      toast({
+        title: "Error",
+        description:
+          "Invalid password: use 8-128 printable ASCII characters without spaces",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: user.name, email: user.email, isActive: user.isActive }),
+        body: JSON.stringify({
+          name: user.name,
+          email: user.email,
+          isActive: user.isActive,
+          isAdmin: user.isAdmin,
+          password: password || undefined,
+        }),
       });
       if (res.ok) {
         toast({ title: "User updated" });
+        setPassword("");
+        setInitialIsAdmin(user.isAdmin);
       } else {
         const d = await res.json();
         toast({ title: "Error", description: d.error, variant: "destructive" });
@@ -249,6 +284,32 @@ export default function UserDetailPage() {
             />
             <Label htmlFor="active">Account Active</Label>
           </div>
+          <div className="flex items-center gap-3">
+            <Switch
+              checked={user.isAdmin}
+              onCheckedChange={(v) => setUser({ ...user, isAdmin: v })}
+              id="admin"
+            />
+            <Label htmlFor="admin">Admin</Label>
+          </div>
+          {user.isAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="adminPassword">
+                Admin Password {initialIsAdmin ? "(optional)" : "(required)"}
+              </Label>
+              <Input
+                id="adminPassword"
+                type="password"
+                placeholder={
+                  initialIsAdmin
+                    ? "Leave blank to keep current password"
+                    : "Set an admin password"
+                }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label>API Key</Label>
             <div className="flex items-center gap-2">
