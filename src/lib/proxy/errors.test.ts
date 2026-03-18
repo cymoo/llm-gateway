@@ -50,6 +50,29 @@ describe("normalizeBackendError", () => {
     });
   });
 
+  it("maps upstream rate-limit errors to friendly rate-limit message", async () => {
+    const res = normalizeBackendError(
+      JSON.stringify({
+        error: {
+          message: "Rate limit reached for requests",
+          type: "rate_limit_error",
+          code: "rate_limit_exceeded",
+        },
+      }),
+      429
+    );
+
+    expect(res).not.toBeNull();
+    expect(res?.status).toBe(429);
+    await expect(res?.json()).resolves.toEqual({
+      error: {
+        message: "Upstream model service is rate limited. Please try again later.",
+        type: "rate_limit_error",
+        code: "rate_limit_exceeded",
+      },
+    });
+  });
+
   it("returns null for unknown or non-json backend errors", () => {
     expect(normalizeBackendError("not json", 502)).toBeNull();
     expect(
