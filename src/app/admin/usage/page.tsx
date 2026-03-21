@@ -89,6 +89,27 @@ export default function UsagePage() {
 
   const logsLimit = 50;
 
+  const exportLogsCsv = async () => {
+    const { startDate, endDate } = dateRange;
+    const qs = new URLSearchParams({
+      startDate,
+      endDate,
+      format: "csv",
+    });
+    const res = await fetch(`/api/admin/usage/logs?${qs}`);
+    if (!res.ok) return;
+
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `usage-logs-${startDate || "all"}-${endDate || "all"}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { startDate, endDate } = dateRange;
@@ -292,6 +313,12 @@ export default function UsagePage() {
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={exportLogsCsv}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
           <div className="rounded-xl border">
             <Table>
               <TableHeader>
