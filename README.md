@@ -10,6 +10,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 ## Features
 
 - Unified OpenAI-compatible `chat.completions` proxy endpoint
+- Public self-registration (`/register`) with admin approval workflow
 - User and model access management
 - Quota and rate limiting per user/model
 - Usage analytics (logs and daily statistics)
@@ -103,6 +104,13 @@ Seed is attempted only when all three variables are set:
 - `ADMIN_PASSWORD`
 
 If an admin user already exists (`is_admin=true`), no duplicate admin will be created.
+
+## Self-registration and Approval
+
+- Users can submit account requests on `GET /register` (API: `POST /api/auth/register`).
+- Newly registered users are created as inactive and cannot use API endpoints yet.
+- Admins can review users in `/admin/users` and click **Approve**.
+- Approval calls `POST /api/admin/users/:id/approve`, which activates the account.
 
 ## Scripts
 

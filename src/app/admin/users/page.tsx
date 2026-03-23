@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Pencil, Trash2, RefreshCw, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, RefreshCw, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,18 @@ export default function UsersPage() {
     if (res.ok) {
       toast({ title: "API key regenerated" });
       fetchUsers();
+    }
+  };
+
+  const handleApprove = async (id: string, name: string) => {
+    if (!confirm(`Approve user "${name}"?`)) return;
+    const res = await fetch(`/api/admin/users/${id}/approve`, { method: "POST" });
+    if (res.ok) {
+      toast({ title: "User approved" });
+      fetchUsers();
+    } else {
+      const d = await res.json();
+      toast({ title: "Error", description: d.error, variant: "destructive" });
     }
   };
 
@@ -234,6 +246,15 @@ export default function UsersPage() {
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Approve"
+                        disabled={user.isActive}
+                        onClick={() => handleApprove(user.id, user.name)}
+                      >
+                        <Check className="h-4 w-4 text-green-600" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

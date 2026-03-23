@@ -3,6 +3,7 @@
 一个基于 **Next.js 16** + **Drizzle ORM** + **PostgreSQL** 的 LLM 网关项目，提供：
 
 - 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`）
+- 公开自助注册（`/register`）+ 管理员审批流程
 - 用户与模型权限管理
 - 用户/模型配额与限流控制
 - 使用量统计（usage logs / daily usage）
@@ -85,6 +86,13 @@ npm run dev
 - `ADMIN_PASSWORD`
 
 若数据库中已存在管理员（`is_admin=true`），则不会重复创建。
+
+## 自助注册与审批
+
+- 用户可通过 `GET /register` 提交申请（接口：`POST /api/auth/register`）。
+- 新注册用户默认是未激活状态，无法直接调用 API。
+- 管理员可在 `/admin/users` 页面审核用户并点击 **Approve**。
+- 审批接口为 `POST /api/admin/users/:id/approve`，通过后会激活账户。
 
 ## 常用命令
 
