@@ -57,8 +57,7 @@ describe("RateLimiter", () => {
     // Advance so first request expires but second doesn't
     vi.advanceTimersByTime(59_950); // now at T=60050
 
-    // Should be rejected because T=100 is still within the window (age = 59950 < 60000)
-    // Actually at T=60050, windowStart = 60050 - 60000 = 50
+    // At T=60050, windowStart = 60050 - 60000 = 50
     // T=0 > 50? No → filtered out. T=100 > 50? Yes → kept. length=1 < 2 → allowed
     expect(limiter.check("u1", "m1", 2)).toBe(true); // T=60050, only T=100 in window
   });
