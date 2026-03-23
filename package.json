@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e:real": "vitest run tests/e2e/gateway.real.e2e.test.ts",
+    "test:perf:smoke": "k6 run k6/gateway-smoke.js"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
