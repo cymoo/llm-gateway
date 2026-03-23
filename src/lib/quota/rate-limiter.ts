@@ -19,7 +19,10 @@ class RateLimiter {
     const windowStart = now - 60_000;
     let timestamps = this.windows.get(key) || [];
     timestamps = timestamps.filter((t) => t > windowStart);
-    if (timestamps.length >= maxPerMin) return false;
+    if (timestamps.length >= maxPerMin) {
+      this.windows.set(key, timestamps);
+      return false;
+    }
     timestamps.push(now);
     this.windows.set(key, timestamps);
     return true;
