@@ -14,5 +14,8 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["./vitest.setup.ts"],
     include: ["tests/e2e/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
+    env: {
+      DOTENV_CONFIG_PATH: ".env.test",
+    },
   },
 });
