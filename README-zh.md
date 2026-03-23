@@ -108,8 +108,52 @@ npm run start
 
 项目已增加基于 Vitest 的 API 路由测试。
 
-运行测试：
+运行单元 / API 测试：
 
 ```bash
 npm run test
+```
+
+### 端到端测试（真实请求）
+
+e2e 测试向运行中的网关发送真实 HTTP 请求，验证转发正确性和协议兼容性。
+需要一个正在运行的网关以及可连接的 PostgreSQL 数据库（其中至少有一个激活用户和模型）。
+
+1. **启动网关**（在另一个终端）：
+
+   ```bash
+   npm run dev
+   ```
+
+2. **配置 `.env.test`** — 确保以下变量已设置：
+
+   ```env
+   # 测试请求的网关地址
+   TEST_BASE_URL=http://localhost:3000
+
+   # PostgreSQL 连接串，用于测试查询
+   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/llm_gateway
+
+   # 可选：指定测试用户 / 模型
+   TEST_USER_ID=
+   TEST_USER_EMAIL=
+   TEST_MODEL_PROVIDER=
+   TEST_MODEL_NAME=
+
+   # 单次请求超时（毫秒，默认 60000）
+   TEST_HTTP_TIMEOUT_MS=60000
+   ```
+
+   如果需要将 e2e 数据库独立配置，也可以使用 `TEST_DATABASE_URL` 代替 `DATABASE_URL`。
+
+3. **运行端到端测试**：
+
+   ```bash
+   npm run test:e2e:real
+   ```
+
+### 性能冒烟测试（k6）
+
+```bash
+npm run test:perf:smoke
 ```

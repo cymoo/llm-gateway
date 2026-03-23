@@ -7,8 +7,8 @@
  * Configuration (via .env.test or environment variables):
  *   TEST_BASE_URL        - Gateway base URL (default: http://localhost:3001)
  *   TEST_HTTP_TIMEOUT_MS - Per-request timeout in ms (default: 60000)
- *   DATABASE_URL         - Full Postgres connection URL (takes priority over TEST_DB_* vars)
- *   TEST_DB_HOST/PORT/USER/PASSWORD/NAME - Individual DB connection vars
+ *   DATABASE_URL         - Full Postgres connection URL (takes priority over TEST_DATABASE_URL)
+ *   TEST_DATABASE_URL    - Full Postgres connection URL for tests
  *   TEST_USER_ID         - Optional: resolve test user by id
  *   TEST_USER_EMAIL      - Optional: resolve test user by email
  *   TEST_MODEL_PROVIDER  - Optional: filter models by backend_url substring
@@ -26,16 +26,14 @@ const BASE_URL = process.env.TEST_BASE_URL ?? "http://localhost:3001";
 const HTTP_TIMEOUT_MS = Number(process.env.TEST_HTTP_TIMEOUT_MS ?? 60_000);
 
 function buildPoolConfig() {
-  if (process.env.DATABASE_URL) {
-    return { connectionString: process.env.DATABASE_URL };
+  const connectionString =
+    process.env.DATABASE_URL ?? process.env.TEST_DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL or TEST_DATABASE_URL must be set for e2e tests"
+    );
   }
-  return {
-    host: process.env.TEST_DB_HOST ?? "127.0.0.1",
-    port: Number(process.env.TEST_DB_PORT ?? 5432),
-    user: process.env.TEST_DB_USER,
-    password: process.env.TEST_DB_PASSWORD,
-    database: process.env.TEST_DB_NAME,
-  };
+  return { connectionString };
 }
 
 const pool = new Pool(buildPoolConfig());

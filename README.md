@@ -126,8 +126,54 @@ npm run start
 
 This project now includes API route tests using Vitest.
 
-Run API tests:
+Run unit / API tests:
 
 ```bash
 npm run test
+```
+
+### End-to-End Tests (Real Requests)
+
+The e2e suite sends real HTTP requests to a running gateway and verifies forwarding
+correctness and protocol compatibility. It requires a running gateway and a reachable
+PostgreSQL database with at least one active user and model.
+
+1. **Start the gateway** (in a separate terminal):
+
+   ```bash
+   npm run dev
+   ```
+
+2. **Configure `.env.test`** — make sure the following variables are set:
+
+   ```env
+   # Gateway URL the tests will hit
+   TEST_BASE_URL=http://localhost:3000
+
+   # PostgreSQL connection for test queries
+   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/llm_gateway
+
+   # Optional: narrow down test user / model
+   TEST_USER_ID=
+   TEST_USER_EMAIL=
+   TEST_MODEL_PROVIDER=
+   TEST_MODEL_NAME=
+
+   # Per-request timeout in milliseconds (default: 60000)
+   TEST_HTTP_TIMEOUT_MS=60000
+   ```
+
+   You can also use `TEST_DATABASE_URL` instead of `DATABASE_URL` if you want to
+   keep the e2e database separate.
+
+3. **Run the e2e tests**:
+
+   ```bash
+   npm run test:e2e:real
+   ```
+
+### Performance Smoke Test (k6)
+
+```bash
+npm run test:perf:smoke
 ```
