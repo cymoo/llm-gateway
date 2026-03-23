@@ -21,7 +21,7 @@ interface BackendErrorPayload {
   error?: {
     message?: string;
     type?: string;
-    code?: string;
+    code?: string | number;
   };
 }
 
@@ -59,8 +59,8 @@ export function normalizeBackendError(
   }
 
   const message = error.message.toLowerCase();
-  const code = error.code?.toLowerCase() ?? "";
-  const type = error.type?.toLowerCase() ?? "";
+  const code = error.code != null ? String(error.code).toLowerCase() : "";
+  const type = error.type != null ? String(error.type).toLowerCase() : "";
 
   if (
     code === "insufficient_quota" ||

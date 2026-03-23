@@ -73,6 +73,22 @@ describe("normalizeBackendError", () => {
     });
   });
 
+  it("handles numeric error.code without throwing", () => {
+    const res = normalizeBackendError(
+      JSON.stringify({
+        error: {
+          message: "Field required",
+          type: "Bad Request",
+          code: 400,
+        },
+      }),
+      400
+    );
+
+    // No matching rule, so returns null — but must not throw
+    expect(res).toBeNull();
+  });
+
   it("returns null for unknown or non-json backend errors", () => {
     expect(normalizeBackendError("not json", 502)).toBeNull();
     expect(
