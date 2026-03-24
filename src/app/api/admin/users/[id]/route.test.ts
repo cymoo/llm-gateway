@@ -48,7 +48,7 @@ describe("PUT /api/admin/users/[id]", () => {
     vi.clearAllMocks();
     mockGetAdminUser.mockResolvedValue({ userId: "admin-1" });
     mockSelectLimit.mockResolvedValue([
-      { id: "user-1", isAdmin: false, passwordHash: null },
+      { id: "user-1", isAdmin: false, passwordHash: null, remark: null },
     ]);
     mockUpdateReturning.mockResolvedValue([{ id: "user-1" }]);
   });
@@ -91,5 +91,15 @@ describe("PUT /api/admin/users/[id]", () => {
     expect(updates.isAdmin).toBe(true);
     expect(updates.passwordHash).toBeTypeOf("string");
     expect(updates.passwordHash).not.toBe("Valid#Pass123");
+  });
+
+  it("updates remark when provided", async () => {
+    const req = { json: async () => ({ remark: "vip user" }) };
+    const res = await PUT(req as never, { params: Promise.resolve({ id: "user-1" }) });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    const updates = mockUpdateSet.mock.calls[0][0];
+    expect(updates.remark).toBe("vip user");
   });
 });

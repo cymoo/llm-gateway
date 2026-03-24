@@ -16,6 +16,7 @@ interface ModelForm {
   backendUrl: string;
   backendModel: string;
   backendApiKey: string;
+  remark: string;
   isActive: boolean;
   defaultMaxTokensPerDay: string;
   defaultMaxRequestsPerDay: string;
@@ -29,6 +30,7 @@ const emptyForm: ModelForm = {
   backendUrl: "",
   backendModel: "",
   backendApiKey: "",
+  remark: "",
   isActive: true,
   defaultMaxTokensPerDay: "",
   defaultMaxRequestsPerDay: "",
@@ -122,6 +124,19 @@ export function ModelFormComponent({
               onChange={(e) => set("backendApiKey", e.target.value)}
               placeholder="sk-..."
               type="password"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="remark">
+              Remark <span className="text-[hsl(var(--muted-foreground))]">(optional)</span>
+            </Label>
+            <textarea
+              id="remark"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              rows={3}
+              value={form.remark}
+              onChange={(e) => set("remark", e.target.value)}
+              placeholder="Optional remark"
             />
           </div>
           <div className="flex items-center gap-3">
@@ -238,6 +253,7 @@ export default function NewModelPage() {
         backendUrl: form.backendUrl,
         backendModel: form.backendModel,
         backendApiKey: form.backendApiKey || undefined,
+        remark: form.remark || null,
         isActive: form.isActive,
         defaultMaxTokensPerDay: form.defaultMaxTokensPerDay
           ? parseInt(form.defaultMaxTokensPerDay)

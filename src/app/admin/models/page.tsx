@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Trash2, Wifi, WifiOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +20,7 @@ interface Model {
   alias: string;
   backendUrl: string;
   backendModel: string;
+  remark?: string | null;
   isActive: boolean;
   userCount: number;
   createdAt: string;
@@ -98,19 +99,20 @@ export default function ModelsPage() {
               <TableHead>Backend Model</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Users</TableHead>
+              <TableHead>Remark</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : models.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                   No models registered
                 </TableCell>
               </TableRow>
@@ -128,6 +130,9 @@ export default function ModelsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>{model.userCount}</TableCell>
+                  <TableCell className="max-w-xs truncate text-sm text-[hsl(var(--muted-foreground))]">
+                    {model.remark || "—"}
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
                       <Button

@@ -36,6 +36,7 @@ describe("POST /api/admin/models", () => {
       {
         id: "model-1",
         alias: "gpt_4.1-mini",
+        remark: null,
       },
     ]);
   });
@@ -70,5 +71,22 @@ describe("POST /api/admin/models", () => {
     expect(res.status).toBe(400);
     expect(body.error).toContain("Invalid alias");
     expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("accepts optional remark", async () => {
+    const req = {
+      json: async () => ({
+        alias: "gpt_4.1-mini",
+        backendUrl: "https://api.example.com/v1",
+        backendModel: "gpt-4.1-mini",
+        remark: "internal model",
+      }),
+    };
+    const res = await POST(req as never);
+
+    expect(res.status).toBe(201);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+    const values = mockInsert.mock.results[0].value.values.mock.calls[0][0];
+    expect(values.remark).toBe("internal model");
   });
 });

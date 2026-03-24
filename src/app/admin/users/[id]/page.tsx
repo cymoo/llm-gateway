@@ -31,6 +31,7 @@ interface UserData {
   id: string;
   name: string;
   email: string;
+  remark?: string | null;
   apiKey: string;
   isActive: boolean;
   isAdmin: boolean;
@@ -130,6 +131,7 @@ export default function UserDetailPage() {
         body: JSON.stringify({
           name: user.name,
           email: user.email,
+          remark: user.remark,
           isActive: user.isActive,
           isAdmin: user.isAdmin,
           password: password || undefined,
@@ -271,6 +273,17 @@ export default function UserDetailPage() {
                 onChange={(e) => setUser({ ...user, email: e.target.value })}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="remark">Remark</Label>
+            <textarea
+              id="remark"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              rows={3}
+              value={user.remark || ""}
+              onChange={(e) => setUser({ ...user, remark: e.target.value })}
+              placeholder="Optional remark"
+            />
           </div>
           <div className="flex items-center gap-3">
             <Switch

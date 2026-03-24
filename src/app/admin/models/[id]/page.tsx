@@ -19,6 +19,7 @@ export default function ModelDetailPage() {
     backendUrl: string;
     backendModel: string;
     backendApiKey: string;
+    remark: string;
     isActive: boolean;
     defaultMaxTokensPerDay: string;
     defaultMaxRequestsPerDay: string;
@@ -40,6 +41,7 @@ export default function ModelDetailPage() {
           backendUrl: data.backendUrl || "",
           backendModel: data.backendModel || "",
           backendApiKey: "",
+          remark: data.remark || "",
           isActive: data.isActive ?? true,
           defaultMaxTokensPerDay: data.defaultMaxTokensPerDay?.toString() || "",
           defaultMaxRequestsPerDay: data.defaultMaxRequestsPerDay?.toString() || "",
@@ -60,6 +62,7 @@ export default function ModelDetailPage() {
         alias: form.alias,
         backendUrl: form.backendUrl,
         backendModel: form.backendModel,
+        remark: form.remark || null,
         isActive: form.isActive,
         defaultMaxTokensPerDay: form.defaultMaxTokensPerDay
           ? parseInt(form.defaultMaxTokensPerDay)

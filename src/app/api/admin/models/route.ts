@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
         backendUrl,
         backendModel,
         backendApiKey: backendApiKey || null,
+        remark: rest.remark,
         isActive: rest.isActive ?? true,
         defaultMaxTokensPerDay: rest.defaultMaxTokensPerDay ?? null,
         defaultMaxRequestsPerDay: rest.defaultMaxRequestsPerDay ?? null,
