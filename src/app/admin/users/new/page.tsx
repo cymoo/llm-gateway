@@ -15,6 +15,7 @@ export default function NewUserPage() {
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [remark, setRemark] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -27,7 +28,7 @@ export default function NewUserPage() {
       const res = await fetch("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, remark }),
       });
 
       if (res.ok) {
@@ -83,6 +84,17 @@ export default function NewUserPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="john@example.com"
                 required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="remark">Remark</Label>
+              <textarea
+                id="remark"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                rows={3}
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="Optional remark"
               />
             </div>
             {error && (

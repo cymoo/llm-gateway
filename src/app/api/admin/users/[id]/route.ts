@@ -28,7 +28,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!admin) return unauthorizedResponse();
 
   const { id } = await params;
-  const { name, email, isActive, isAdmin, password } = await req.json();
+  const { name, email, remark, isActive, isAdmin, password } = await req.json();
   const userRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
   if (userRows.length === 0) return notFoundResponse("User not found");
@@ -63,6 +63,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const updates: Partial<typeof users.$inferInsert> = {};
   if (name !== undefined) updates.name = name;
   if (email !== undefined) updates.email = email;
+  if (remark !== undefined) updates.remark = remark;
   if (isActive !== undefined) updates.isActive = isActive;
   if (isAdmin !== undefined) updates.isAdmin = isAdmin;
   if (hasPassword) updates.passwordHash = await bcrypt.hash(password, 10);

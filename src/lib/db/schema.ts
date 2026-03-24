@@ -22,6 +22,7 @@ export const users = pgTable(
     email: varchar("email", { length: 255 }).unique().notNull(),
     passwordHash: varchar("password_hash", { length: 255 }),
     apiKey: varchar("api_key", { length: 64 }).unique().notNull(),
+    remark: varchar("remark", { length: 1000 }),
     isActive: boolean("is_active").default(true),
     isAdmin: boolean("is_admin").default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).default(
@@ -45,6 +46,7 @@ export const models = pgTable(
     backendUrl: varchar("backend_url", { length: 500 }).notNull(),
     backendModel: varchar("backend_model", { length: 200 }).notNull(),
     backendApiKey: varchar("backend_api_key", { length: 200 }),
+    remark: varchar("remark", { length: 1000 }),
     isActive: boolean("is_active").default(true),
     defaultMaxTokensPerDay: bigint("default_max_tokens_per_day", {
       mode: "number",

@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
     name: u.name,
     email: u.email,
     apiKey: u.apiKey,
+    remark: u.remark,
     isActive: u.isActive,
     isAdmin: u.isAdmin,
     createdAt: u.createdAt,
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
   const admin = await getAdminUser(req);
   if (!admin) return unauthorizedResponse();
 
-  const { name, email } = await req.json();
+  const { name, email, remark } = await req.json();
 
   if (!name || !email) {
     return Response.json({ error: "Name and email are required" }, { status: 400 });
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
   try {
     const [user] = await db
       .insert(users)
-      .values({ name, email, apiKey, isActive: true, isAdmin: false })
+      .values({ name, email, apiKey, remark, isActive: true, isAdmin: false })
       .returning();
 
     return Response.json(user, { status: 201 });

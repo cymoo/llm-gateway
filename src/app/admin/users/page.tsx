@@ -22,6 +22,7 @@ interface User {
   name: string;
   email: string;
   apiKey: string;
+  remark?: string | null;
   isActive: boolean;
   isAdmin: boolean;
   createdAt: string;
@@ -177,6 +178,7 @@ export default function UsersPage() {
               <TableHead>Status</TableHead>
               <TableHead>Models</TableHead>
               <TableHead>Today</TableHead>
+              <TableHead>Remark</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -184,7 +186,7 @@ export default function UsersPage() {
             {loading ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-8 text-[hsl(var(--muted-foreground))]"
                 >
                   Loading...
@@ -193,7 +195,7 @@ export default function UsersPage() {
             ) : users.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={8}
                   className="text-center py-8 text-[hsl(var(--muted-foreground))]"
                 >
                   No users found
@@ -238,6 +240,9 @@ export default function UsersPage() {
                   <TableCell className="text-sm text-[hsl(var(--muted-foreground))]">
                     {formatNum(user.todayRequests)} req /{" "}
                     {formatNum(user.todayTokens)} tok
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate text-sm text-[hsl(var(--muted-foreground))]">
+                    {user.remark || "—"}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">

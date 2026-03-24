@@ -42,6 +42,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     "backendUrl",
     "backendModel",
     "backendApiKey",
+    "remark",
     "isActive",
     "defaultMaxTokensPerDay",
     "defaultMaxRequestsPerDay",
