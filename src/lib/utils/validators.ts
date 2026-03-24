@@ -1,4 +1,4 @@
-export const MODEL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/;
+export const MODEL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9._/-]*[a-z0-9])?$/;
 export const ADMIN_PASSWORD_PATTERN = /^[\x21-\x7e]+$/;
 
 export function validateModelAlias(alias: string): boolean {
