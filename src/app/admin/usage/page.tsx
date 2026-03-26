@@ -17,6 +17,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   BarChart,
   Bar,
   XAxis,
@@ -90,7 +97,7 @@ export default function UsagePage() {
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [selectedPromptLog, setSelectedPromptLog] = useState<Log | null>(null);
 
   const logsLimit = 50;
 
@@ -375,17 +382,17 @@ export default function UsagePage() {
                       </TableCell>
                       <TableCell className="text-xs max-w-[200px]">
                         {log.promptPreview ? (
-                          <span
-                            className="cursor-pointer hover:text-[hsl(var(--primary))]"
-                            title={expandedLogId === log.id ? "Click to collapse" : "Click to expand"}
-                            onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                          <button
+                            type="button"
+                            className="text-left cursor-pointer hover:text-[hsl(var(--primary))] w-full"
+                            title="Click to view full prompt"
+                            onClick={() => setSelectedPromptLog(log)}
                           >
-                            {expandedLogId === log.id ? (
-                              <span className="whitespace-pre-wrap break-all">{log.promptPreview}</span>
-                            ) : (
-                              <span className="truncate block">{log.promptPreview.slice(0, PROMPT_TRUNCATE_LENGTH)}{log.promptPreview.length > PROMPT_TRUNCATE_LENGTH ? "…" : ""}</span>
-                            )}
-                          </span>
+                            <span className="truncate block">
+                              {log.promptPreview.slice(0, PROMPT_TRUNCATE_LENGTH)}
+                              {log.promptPreview.length > PROMPT_TRUNCATE_LENGTH ? "…" : ""}
+                            </span>
+                          </button>
                         ) : (
                           "—"
                         )}
@@ -439,6 +446,24 @@ export default function UsagePage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={selectedPromptLog !== null} onOpenChange={(open) => !open && setSelectedPromptLog(null)}>
+        <DialogContent className="max-w-4xl w-[90vw]">
+          <DialogHeader>
+            <DialogTitle>Full Prompt</DialogTitle>
+            <DialogDescription>
+              {selectedPromptLog?.createdAt
+                ? `Request at ${new Date(selectedPromptLog.createdAt).toLocaleString()}`
+                : "Request prompt content"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto rounded-md border p-3">
+            <pre className="whitespace-pre-wrap break-words text-sm">
+              {selectedPromptLog?.promptPreview || "—"}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

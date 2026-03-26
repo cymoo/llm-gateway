@@ -2,6 +2,7 @@ import {
   pgTable,
   uuid,
   varchar,
+  text,
   boolean,
   timestamp,
   time,
@@ -116,7 +117,7 @@ export const usageLogs = pgTable(
     isStream: boolean("is_stream").default(false),
     durationMs: integer("duration_ms"),
     status: varchar("status", { length: 20 }),
-    promptPreview: varchar("prompt_preview", { length: 500 }),
+    promptPreview: text("prompt_preview"),
     clientIp: varchar("client_ip", { length: 45 }),
     createdAt: timestamp("created_at", { withTimezone: true }).default(
       sql`now()`

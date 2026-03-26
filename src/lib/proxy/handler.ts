@@ -87,8 +87,9 @@ export async function handleProxy(
   const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
   if (Array.isArray(messages)) {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user" && messages[i].content) {
-        promptPreview = messages[i].content!.slice(0, 500);
+      const messageContent = messages[i].content;
+      if (messages[i].role === "user" && typeof messageContent === "string") {
+        promptPreview = messageContent;
         break;
       }
     }
