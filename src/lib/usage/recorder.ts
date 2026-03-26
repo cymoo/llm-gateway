@@ -12,6 +12,8 @@ export interface UsageRecord {
   isStream: boolean;
   durationMs: number;
   status: "success" | "error";
+  promptPreview?: string | null;
+  clientIp?: string | null;
 }
 
 function getTodayStr(): string {
@@ -38,6 +40,8 @@ export function recordUsage(record: UsageRecord): void {
         isStream: record.isStream,
         durationMs: record.durationMs,
         status: record.status,
+        promptPreview: record.promptPreview ?? null,
+        clientIp: record.clientIp ?? null,
       });
 
       // Upsert daily usage

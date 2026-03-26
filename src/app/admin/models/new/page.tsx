@@ -123,7 +123,7 @@ export function ModelFormComponent({
               value={form.backendApiKey}
               onChange={(e) => set("backendApiKey", e.target.value)}
               placeholder="sk-..."
-              type="password"
+              type="text"
             />
           </div>
           <div className="space-y-2">

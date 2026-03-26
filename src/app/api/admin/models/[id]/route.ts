@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { models } from "@/lib/db/schema";
+import { models, usageLogs, dailyUsage } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import {
   getAdminUser,
@@ -79,6 +79,14 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!admin) return unauthorizedResponse();
 
   const { id } = await params;
+
+  // Nullify model references in usage logs and remove daily usage records
+  // to avoid FK constraint violations (these tables don't cascade on delete)
+  await Promise.all([
+    db.update(usageLogs).set({ modelId: null }).where(eq(usageLogs.modelId, id)),
+    db.delete(dailyUsage).where(eq(dailyUsage.modelId, id)),
+  ]);
+
   const [deleted] = await db
     .delete(models)
     .where(eq(models.id, id))

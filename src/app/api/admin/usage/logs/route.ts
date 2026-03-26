@@ -21,6 +21,8 @@ function toCsv(logs: Array<{
   isStream: boolean | null;
   durationMs: number | null;
   status: string | null;
+  promptPreview: string | null;
+  clientIp: string | null;
   createdAt: Date | null;
 }>): string {
   const header = [
@@ -35,6 +37,8 @@ function toCsv(logs: Array<{
     "stream",
     "duration_ms",
     "status",
+    "prompt_preview",
+    "client_ip",
   ];
   const rows = logs.map((log) =>
     [
@@ -49,6 +53,8 @@ function toCsv(logs: Array<{
       log.isStream ?? false,
       log.durationMs ?? "",
       log.status ?? "",
+      log.promptPreview ?? "",
+      log.clientIp ?? "",
     ]
       .map(escapeCsvValue)
       .join(",")
@@ -98,6 +104,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        promptPreview: usageLogs.promptPreview,
+        clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,
       })
       .from(usageLogs)
@@ -138,6 +146,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        promptPreview: usageLogs.promptPreview,
+        clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,
       })
       .from(usageLogs)
