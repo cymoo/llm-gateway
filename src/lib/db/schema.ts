@@ -1,17 +1,17 @@
 import {
-  pgTable,
-  uuid,
-  varchar,
-  text,
-  boolean,
-  timestamp,
-  time,
   bigint,
-  integer,
+  boolean,
   date,
   index,
-  unique,
+  integer,
+  pgTable,
   primaryKey,
+  text,
+  time,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 

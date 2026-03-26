@@ -97,7 +97,7 @@ export default function UsagePage() {
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [selectedPromptLog, setSelectedPromptLog] = useState<Log | null>(null);
+  const [selectedLog, setSelectedLog] = useState<Log | null>(null);
 
   const logsLimit = 50;
 
@@ -386,7 +386,7 @@ export default function UsagePage() {
                             type="button"
                             className="text-left cursor-pointer hover:text-[hsl(var(--primary))] w-full"
                             title="Click to view full prompt"
-                            onClick={() => setSelectedPromptLog(log)}
+                            onClick={() => setSelectedLog(log)}
                           >
                             <span className="truncate block">
                               {log.promptPreview.slice(0, PROMPT_TRUNCATE_LENGTH)}
@@ -447,19 +447,19 @@ export default function UsagePage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={selectedPromptLog !== null} onOpenChange={(open) => !open && setSelectedPromptLog(null)}>
+      <Dialog open={selectedLog !== null} onOpenChange={(open) => !open && setSelectedLog(null)}>
         <DialogContent className="max-w-4xl w-[90vw]">
           <DialogHeader>
             <DialogTitle>Full Prompt</DialogTitle>
             <DialogDescription>
-              {selectedPromptLog?.createdAt
-                ? `Request at ${new Date(selectedPromptLog.createdAt).toLocaleString()}`
+              {selectedLog?.createdAt
+                ? `Request at ${new Date(selectedLog.createdAt).toLocaleString()}`
                 : "Request prompt content"}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto rounded-md border p-3">
             <pre className="whitespace-pre-wrap break-words text-sm">
-              {selectedPromptLog?.promptPreview || "—"}
+              {selectedLog?.promptPreview || "—"}
             </pre>
           </div>
         </DialogContent>
