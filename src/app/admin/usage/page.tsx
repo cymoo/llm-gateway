@@ -57,6 +57,8 @@ interface Log {
   createdAt: string;
 }
 
+const PROMPT_TRUNCATE_LENGTH = 50;
+
 function formatNum(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
@@ -381,7 +383,7 @@ export default function UsagePage() {
                             {expandedLogId === log.id ? (
                               <span className="whitespace-pre-wrap break-all">{log.promptPreview}</span>
                             ) : (
-                              <span className="truncate block">{log.promptPreview.slice(0, 50)}{log.promptPreview.length > 50 ? "…" : ""}</span>
+                              <span className="truncate block">{log.promptPreview.slice(0, PROMPT_TRUNCATE_LENGTH)}{log.promptPreview.length > PROMPT_TRUNCATE_LENGTH ? "…" : ""}</span>
                             )}
                           </span>
                         ) : (
