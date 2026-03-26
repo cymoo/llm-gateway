@@ -82,6 +82,22 @@ export async function handleProxy(
     );
   }
 
+  // Extract prompt preview from messages
+  let promptPreview: string | null = null;
+  const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
+  if (Array.isArray(messages)) {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+    if (lastUserMsg?.content) {
+      promptPreview = lastUserMsg.content.slice(0, 500);
+    }
+  }
+
+  // Extract client IP
+  const clientIp =
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    null;
+
   // 3. Resolve model
   const modelRows = await db
     .select()
@@ -210,6 +226,8 @@ export async function handleProxy(
           isStream: true,
           durationMs,
           status: backendResponse.ok ? "success" : "error",
+          promptPreview,
+          clientIp,
         });
       });
 
@@ -250,6 +268,8 @@ export async function handleProxy(
         isStream: false,
         durationMs,
         status: backendResponse.ok ? "success" : "error",
+        promptPreview,
+        clientIp,
       });
 
       return new Response(responseText, {

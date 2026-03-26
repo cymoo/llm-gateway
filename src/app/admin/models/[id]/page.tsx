@@ -40,7 +40,7 @@ export default function ModelDetailPage() {
           alias: data.alias || "",
           backendUrl: data.backendUrl || "",
           backendModel: data.backendModel || "",
-          backendApiKey: "",
+          backendApiKey: data.backendApiKey || "",
           remark: data.remark || "",
           isActive: data.isActive ?? true,
           defaultMaxTokensPerDay: data.defaultMaxTokensPerDay?.toString() || "",

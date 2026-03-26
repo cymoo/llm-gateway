@@ -52,6 +52,8 @@ interface Log {
   isStream: boolean;
   durationMs: number | null;
   status: string | null;
+  promptPreview: string | null;
+  clientIp: string | null;
   createdAt: string;
 }
 
@@ -86,6 +88,7 @@ export default function UsagePage() {
   const [logsTotal, setLogsTotal] = useState(0);
   const [logsPage, setLogsPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const logsLimit = 50;
 
@@ -325,8 +328,10 @@ export default function UsagePage() {
                 <TableRow>
                   <TableHead>Time</TableHead>
                   <TableHead>User</TableHead>
+                  <TableHead>IP</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Prompt</TableHead>
                   <TableHead className="text-right">Tokens</TableHead>
                   <TableHead className="text-right">Duration</TableHead>
                   <TableHead>Status</TableHead>
@@ -335,13 +340,13 @@ export default function UsagePage() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                    <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                       Loading...
                     </TableCell>
                   </TableRow>
                 ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                    <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                       No logs for this period
                     </TableCell>
                   </TableRow>
@@ -352,6 +357,9 @@ export default function UsagePage() {
                         {new Date(log.createdAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-sm">{log.userName || "—"}</TableCell>
+                      <TableCell className="text-xs text-[hsl(var(--muted-foreground))] font-mono">
+                        {log.clientIp || "—"}
+                      </TableCell>
                       <TableCell className="text-sm font-mono">{log.modelAlias || "—"}</TableCell>
                       <TableCell className="text-xs">
                         <div className="flex items-center gap-1">
@@ -362,6 +370,23 @@ export default function UsagePage() {
                             </Badge>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[200px]">
+                        {log.promptPreview ? (
+                          <span
+                            className="cursor-pointer hover:text-[hsl(var(--primary))]"
+                            title={expandedLogId === log.id ? "Click to collapse" : "Click to expand"}
+                            onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                          >
+                            {expandedLogId === log.id ? (
+                              <span className="whitespace-pre-wrap break-all">{log.promptPreview}</span>
+                            ) : (
+                              <span className="truncate block">{log.promptPreview.slice(0, 50)}{log.promptPreview.length > 50 ? "…" : ""}</span>
+                            )}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         {formatNum(log.totalTokens || 0)}
