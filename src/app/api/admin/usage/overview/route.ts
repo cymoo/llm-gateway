@@ -21,13 +21,18 @@ export async function GET(req: NextRequest) {
 
   const [
     totalUsers,
+    totalModels,
     activeModels,
     todayStats,
     last7Stats,
     last30Stats,
+    allTimeStats,
+    activeLast7Days,
+    recentLogStats,
     dailyTrend,
   ] = await Promise.all([
     db.select({ count: count() }).from(users),
+    db.select({ count: count() }).from(models),
     db
       .select({ count: count() })
       .from(models)
@@ -55,6 +60,26 @@ export async function GET(req: NextRequest) {
       .where(sql`${dailyUsage.date} >= ${date30}`),
     db
       .select({
+        totalTokens: sql<number>`coalesce(sum(${dailyUsage.totalTokens}), 0)`,
+        requestCount: sql<number>`coalesce(sum(${dailyUsage.requestCount}), 0)`,
+      })
+      .from(dailyUsage),
+    db
+      .select({
+        activeUsers: sql<number>`count(distinct ${dailyUsage.userId})`,
+        activeModels: sql<number>`count(distinct ${dailyUsage.modelId})`,
+      })
+      .from(dailyUsage)
+      .where(sql`${dailyUsage.date} >= ${date7}`),
+    db
+      .select({
+        total: count(),
+        success: sql<number>`coalesce(sum(case when ${usageLogs.status} = 'success' then 1 else 0 end), 0)`,
+      })
+      .from(usageLogs)
+      .where(gte(usageLogs.createdAt, new Date(date7 + "T00:00:00Z"))),
+    db
+      .select({
         date: dailyUsage.date,
         totalTokens: sql<number>`coalesce(sum(${dailyUsage.totalTokens}), 0)`,
         requestCount: sql<number>`coalesce(sum(${dailyUsage.requestCount}), 0)`,
@@ -67,6 +92,7 @@ export async function GET(req: NextRequest) {
 
   return Response.json({
     totalUsers: totalUsers[0].count,
+    totalModels: totalModels[0].count,
     activeModels: activeModels[0].count,
     today: {
       totalTokens: todayStats[0].totalTokens,
@@ -80,6 +106,20 @@ export async function GET(req: NextRequest) {
       totalTokens: last30Stats[0].totalTokens,
       requestCount: last30Stats[0].requestCount,
     },
+    allTime: {
+      totalTokens: allTimeStats[0].totalTokens,
+      requestCount: allTimeStats[0].requestCount,
+    },
+    activeLast7Days: {
+      users: activeLast7Days[0].activeUsers,
+      models: activeLast7Days[0].activeModels,
+    },
+    successRate7Days:
+      recentLogStats[0].total > 0
+        ? Number(
+            ((recentLogStats[0].success / recentLogStats[0].total) * 100).toFixed(1)
+          )
+        : 0,
     dailyTrend,
   });
 }

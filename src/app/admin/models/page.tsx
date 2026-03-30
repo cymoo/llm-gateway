@@ -13,6 +13,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 
 interface Model {
@@ -26,11 +33,20 @@ interface Model {
   createdAt: string;
 }
 
+interface ModelUser {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export default function ModelsPage() {
   const { toast } = useToast();
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<{ id: string; alias: string } | null>(null);
+  const [modelUsers, setModelUsers] = useState<ModelUser[]>([]);
+  const [loadingModelUsers, setLoadingModelUsers] = useState(false);
 
   const fetchModels = useCallback(async () => {
     setLoading(true);
@@ -71,6 +87,46 @@ export default function ModelsPage() {
     } finally {
       setTestingId(null);
     }
+  };
+
+  const openUsersDialog = async (model: Model) => {
+    setSelectedModel({ id: model.id, alias: model.alias });
+    setLoadingModelUsers(true);
+    try {
+      const res = await fetch(`/api/admin/models/${model.id}/users`);
+      if (res.ok) {
+        setModelUsers(await res.json());
+      } else {
+        setModelUsers([]);
+      }
+    } finally {
+      setLoadingModelUsers(false);
+    }
+  };
+
+  const handleRemoveUser = async (userId: string, userName: string) => {
+    if (!selectedModel) return;
+    if (!confirm(`Remove "${userName}" from model "${selectedModel.alias}"?`)) return;
+    const res = await fetch(`/api/admin/users/${userId}/models/${selectedModel.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      toast({
+        title: "Error",
+        description: "Failed to remove user from model",
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "User removed" });
+    setModelUsers((prev) => prev.filter((u) => u.id !== userId));
+    setModels((prev) =>
+      prev.map((m) =>
+        m.id === selectedModel.id
+          ? { ...m, userCount: Math.max(0, m.userCount - 1) }
+          : m
+      )
+    );
   };
 
   return (
@@ -129,7 +185,15 @@ export default function ModelsPage() {
                       {model.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
-                  <TableCell>{model.userCount}</TableCell>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="text-[hsl(var(--primary))] hover:underline"
+                      onClick={() => openUsersDialog(model)}
+                    >
+                      {model.userCount}
+                    </button>
+                  </TableCell>
                   <TableCell className="max-w-xs truncate text-sm text-[hsl(var(--muted-foreground))]">
                     {model.remark || "—"}
                   </TableCell>
@@ -169,6 +233,75 @@ export default function ModelsPage() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog
+        open={selectedModel !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedModel(null);
+            setModelUsers([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Authorized Users</DialogTitle>
+            <DialogDescription>
+              {selectedModel ? `Model: ${selectedModel.alias}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border max-h-[60vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingModelUsers ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="text-center py-8 text-[hsl(var(--muted-foreground))]"
+                    >
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : modelUsers.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="text-center py-8 text-[hsl(var(--muted-foreground))]"
+                    >
+                      No authorized users
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  modelUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="text-[hsl(var(--muted-foreground))]">
+                        {user.email}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveUser(user.id, user.name)}
+                        >
+                          Remove
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

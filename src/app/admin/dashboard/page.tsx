@@ -22,10 +22,14 @@ import {
 
 interface OverviewData {
   totalUsers: number;
+  totalModels: number;
   activeModels: number;
   today: { totalTokens: number; requestCount: number };
   last7Days: { totalTokens: number; requestCount: number };
   last30Days: { totalTokens: number; requestCount: number };
+  allTime: { totalTokens: number; requestCount: number };
+  activeLast7Days: { users: number; models: number };
+  successRate7Days: number;
   dailyTrend: Array<{ date: string; totalTokens: number; requestCount: number }>;
 }
 
@@ -137,6 +141,34 @@ export default function DashboardPage() {
         />
       </div>
 
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Models"
+          value={data.totalModels}
+          sub={`${data.activeModels} active`}
+          icon={Cpu}
+          color="bg-indigo-500"
+        />
+        <StatCard
+          title="7-Day Active Users"
+          value={data.activeLast7Days.users}
+          icon={Users}
+          color="bg-cyan-500"
+        />
+        <StatCard
+          title="7-Day Active Models"
+          value={data.activeLast7Days.models}
+          icon={TrendingUp}
+          color="bg-emerald-500"
+        />
+        <StatCard
+          title="7-Day Success Rate"
+          value={`${data.successRate7Days}%`}
+          icon={Activity}
+          color="bg-rose-500"
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -205,7 +237,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
@@ -223,6 +255,16 @@ export default function DashboardPage() {
             </p>
             <p className="text-2xl font-bold mt-1">
               {formatNum(data.last30Days.totalTokens)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
+              All-Time Requests
+            </p>
+            <p className="text-2xl font-bold mt-1">
+              {formatNum(data.allTime.requestCount)}
             </p>
           </CardContent>
         </Card>
