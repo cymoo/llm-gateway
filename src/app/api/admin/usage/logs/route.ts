@@ -74,6 +74,7 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get("endDate");
   const userId = searchParams.get("userId");
   const modelId = searchParams.get("modelId");
+  const ip = searchParams.get("ip");
   const format = searchParams.get("format");
   const offset = (page - 1) * limit;
 
@@ -88,6 +89,7 @@ export async function GET(req: NextRequest) {
     );
   if (userId) conditions.push(eq(usageLogs.userId, userId));
   if (modelId) conditions.push(eq(usageLogs.modelId, modelId));
+  if (ip) conditions.push(eq(usageLogs.clientIp, ip));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

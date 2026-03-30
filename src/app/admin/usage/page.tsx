@@ -64,6 +64,12 @@ interface Log {
   createdAt: string;
 }
 
+interface FilterOption {
+  id: string;
+  name?: string;
+  alias?: string;
+}
+
 const PROMPT_TRUNCATE_LENGTH = 50;
 
 function formatNum(n: number): string {
@@ -98,6 +104,11 @@ export default function UsagePage() {
   const [logsPage, setLogsPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
+  const [userFilter, setUserFilter] = useState("");
+  const [ipFilter, setIpFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
+  const [userOptions, setUserOptions] = useState<FilterOption[]>([]);
+  const [modelOptions, setModelOptions] = useState<FilterOption[]>([]);
 
   const logsLimit = 50;
 
@@ -108,6 +119,9 @@ export default function UsagePage() {
       endDate,
       format: "csv",
     });
+    if (userFilter) qs.set("userId", userFilter);
+    if (modelFilter) qs.set("modelId", modelFilter);
+    if (ipFilter.trim()) qs.set("ip", ipFilter.trim());
     const res = await fetch(`/api/admin/usage/logs?${qs}`);
     if (!res.ok) return;
 
@@ -140,6 +154,9 @@ export default function UsagePage() {
           page: logsPage.toString(),
           limit: logsLimit.toString(),
         });
+        if (userFilter) logsQs.set("userId", userFilter);
+        if (modelFilter) logsQs.set("modelId", modelFilter);
+        if (ipFilter.trim()) logsQs.set("ip", ipFilter.trim());
         const res = await fetch(`/api/admin/usage/logs?${logsQs}`);
         if (res.ok) {
           const data = await res.json();
@@ -150,11 +167,25 @@ export default function UsagePage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, dateRange, logsPage]);
+  }, [tab, dateRange, logsPage, userFilter, ipFilter, modelFilter]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    Promise.all([fetch("/api/admin/users?limit=200"), fetch("/api/admin/models")]).then(
+      async ([usersRes, modelsRes]) => {
+        if (usersRes.ok) {
+          const userData = await usersRes.json();
+          setUserOptions(userData.data || []);
+        }
+        if (modelsRes.ok) {
+          setModelOptions(await modelsRes.json());
+        }
+      }
+    );
+  }, []);
 
   const totalPages = Math.ceil(logsTotal / logsLimit);
 
@@ -211,22 +242,40 @@ export default function UsagePage() {
         <TabsContent value="by-user" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {userStats.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Token Usage by User</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={userStats.slice(0, 8)}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="userName" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
-                      <Tooltip formatter={(v) => formatTooltipNumber(v)} />
-                      <Bar dataKey="totalTokens" fill="hsl(221.2, 83.2%, 53.3%)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Token Usage by User</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={userStats.slice(0, 8)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="userName" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
+                        <Tooltip formatter={(v) => formatTooltipNumber(v)} />
+                        <Bar dataKey="totalTokens" fill="hsl(221.2, 83.2%, 53.3%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Request Count by User</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={userStats.slice(0, 8)}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="userName" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
+                        <Tooltip formatter={(v) => formatTooltipNumber(v)} />
+                        <Bar dataKey="requestCount" fill="hsl(142.1, 76.2%, 36.3%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
           <div className="rounded-xl border">
@@ -270,22 +319,40 @@ export default function UsagePage() {
         <TabsContent value="by-model" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {modelStats.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Token Usage by Model</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={modelStats}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="modelAlias" tick={{ fontSize: 11 }} />
-                      <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
-                      <Tooltip formatter={(v) => formatTooltipNumber(v)} />
-                      <Bar dataKey="totalTokens" fill="hsl(25, 95%, 53%)" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Token Usage by Model</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={modelStats}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="modelAlias" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
+                        <Tooltip formatter={(v) => formatTooltipNumber(v)} />
+                        <Bar dataKey="totalTokens" fill="hsl(25, 95%, 53%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Request Count by Model</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={modelStats}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="modelAlias" tick={{ fontSize: 11 }} />
+                        <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
+                        <Tooltip formatter={(v) => formatTooltipNumber(v)} />
+                        <Bar dataKey="requestCount" fill="hsl(142.1, 76.2%, 36.3%)" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </>
             )}
           </div>
           <div className="rounded-xl border">
@@ -325,6 +392,59 @@ export default function UsagePage() {
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label>User</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    value={userFilter}
+                    onChange={(e) => {
+                      setLogsPage(1);
+                      setUserFilter(e.target.value);
+                    }}
+                  >
+                    <option value="">All users</option>
+                    {userOptions.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name || u.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>IP</Label>
+                  <Input
+                    placeholder="e.g. 127.0.0.1"
+                    value={ipFilter}
+                    onChange={(e) => {
+                      setLogsPage(1);
+                      setIpFilter(e.target.value);
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Model</Label>
+                  <select
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                    value={modelFilter}
+                    onChange={(e) => {
+                      setLogsPage(1);
+                      setModelFilter(e.target.value);
+                    }}
+                  >
+                    <option value="">All models</option>
+                    {modelOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.alias || m.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={exportLogsCsv}>
               <Download className="h-4 w-4 mr-2" />

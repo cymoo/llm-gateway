@@ -78,4 +78,14 @@ describe("GET /api/admin/usage/logs?format=csv", () => {
     expect(mockWhere).toHaveBeenCalledTimes(1);
     expect(mockOrderBy).toHaveBeenCalledTimes(1);
   });
+
+  it("applies ip filter when provided", async () => {
+    const req = {
+      url: "http://localhost/api/admin/usage/logs?ip=127.0.0.1&format=csv",
+    };
+    const res = await GET(req as never);
+
+    expect(res.status).toBe(200);
+    expect(mockWhere).toHaveBeenCalledTimes(1);
+  });
 });
