@@ -174,7 +174,7 @@ export default function UsagePage() {
   }, [fetchData]);
 
   useEffect(() => {
-    Promise.all([fetch("/api/admin/users?limit=200"), fetch("/api/admin/models")]).then(
+    Promise.all([fetch("/api/admin/users?limit=1000"), fetch("/api/admin/models")]).then(
       async ([usersRes, modelsRes]) => {
         if (usersRes.ok) {
           const userData = await usersRes.json();

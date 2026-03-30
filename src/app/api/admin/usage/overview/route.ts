@@ -116,8 +116,9 @@ export async function GET(req: NextRequest) {
     },
     successRate7Days:
       recentLogStats[0].total > 0
-        ? Math.round((recentLogStats[0].success / recentLogStats[0].total) * 1000) /
-          10
+        ? Number(
+            ((recentLogStats[0].success / recentLogStats[0].total) * 100).toFixed(1)
+          )
         : 0,
     dailyTrend,
   });

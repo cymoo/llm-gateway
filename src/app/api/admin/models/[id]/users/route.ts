@@ -22,7 +22,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     .from(userModels)
     .innerJoin(users, eq(userModels.userId, users.id))
     .where(eq(userModels.modelId, id))
-    .orderBy(users.createdAt);
+    .orderBy(userModels.createdAt);
 
   return Response.json(result);
 }

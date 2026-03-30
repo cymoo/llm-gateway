@@ -163,7 +163,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="7-Day Success Rate"
-          value={`${data.successRate7Days.toFixed(1)}%`}
+          value={`${data.successRate7Days}%`}
           icon={Activity}
           color="bg-rose-500"
         />
