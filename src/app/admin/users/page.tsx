@@ -2,18 +2,22 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { Plus, Search, Pencil, Trash2, RefreshCw, Copy, Check } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  Copy,
+  Check,
+  Users,
+  ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  Bot,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
 import { copyToClipboard } from "@/lib/utils/clipboard";
 
@@ -138,117 +142,150 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Users</h1>
-          <p className="text-[hsl(var(--muted-foreground))]">
-            Manage user accounts and API keys
-          </p>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-sm shadow-blue-200 dark:shadow-blue-900/30">
+            <Users className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {total > 0 ? `${total} user${total !== 1 ? "s" : ""} total` : "Manage user accounts and API keys"}
+            </p>
+          </div>
         </div>
         <Link href="/admin/users/new">
-          <Button>
+          <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0">
             <Plus className="h-4 w-4 mr-2" />
             Add User
           </Button>
         </Link>
       </div>
 
+      {/* Search Bar */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            className="pl-9"
-            placeholder="Search by name or email..."
+            className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
+            placeholder="Search by name or email…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
-        <Button type="submit" variant="outline">
+        <Button type="submit" variant="outline" className="border-slate-200 dark:border-slate-700">
           Search
         </Button>
       </form>
 
-      <div className="rounded-xl border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>API Key</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Models</TableHead>
-              <TableHead>Today</TableHead>
-              <TableHead>Remark</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+      {/* Table */}
+      <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 overflow-hidden bg-white/80 dark:bg-slate-800/60 shadow-sm">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Name</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Email</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">API Key</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Models</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Today</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Remark</th>
+              <th className="text-right py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
             {loading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center py-8 text-[hsl(var(--muted-foreground))]"
-                >
-                  Loading...
-                </TableCell>
-              </TableRow>
+              <tr>
+                <td colSpan={8} className="text-center py-16 text-slate-400">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm">Loading…</span>
+                  </div>
+                </td>
+              </tr>
             ) : users.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center py-8 text-[hsl(var(--muted-foreground))]"
-                >
-                  No users found
-                </TableCell>
-              </TableRow>
+              <tr>
+                <td colSpan={8} className="text-center py-16 text-slate-400">
+                  <div className="flex flex-col items-center gap-2">
+                    <Bot className="h-10 w-10 opacity-30" />
+                    <span className="text-sm">No users found</span>
+                  </div>
+                </td>
+              </tr>
             ) : (
-              users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
+              users.map((user, i) => (
+                <tr
+                  key={user.id}
+                  className={`border-b border-slate-100 dark:border-slate-700/40 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-700/20 transition-colors ${
+                    i % 2 !== 0 ? "bg-slate-50/30 dark:bg-slate-700/10" : ""
+                  }`}
+                >
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-2 font-medium text-slate-800 dark:text-slate-200">
                       {user.name}
                       {user.isAdmin && (
-                        <Badge variant="secondary" className="text-xs">
-                          Admin
-                        </Badge>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-2 py-0.5 rounded-full">
+                          <ShieldCheck className="h-3 w-3" /> Admin
+                        </span>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="text-[hsl(var(--muted-foreground))]">
+                  </td>
+                  <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
                     {user.email}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
-                      <code className="text-xs bg-[hsl(var(--muted))] px-2 py-1 rounded font-mono max-w-[200px] truncate">
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-1.5">
+                      <code className="text-xs bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-md font-mono max-w-[160px] truncate">
                         {user.apiKey.slice(0, 8) + "••••••••"}
                       </code>
                       <button
                         onClick={() => handleCopyKey(user.apiKey)}
-                        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
                         title="Copy API key"
                       >
                         <Copy className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? "default" : "secondary"}>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                        user.isActive
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          : "bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400"
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          user.isActive ? "bg-emerald-500" : "bg-slate-400"
+                        }`}
+                      />
                       {user.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{user.modelCount}</TableCell>
-                  <TableCell className="text-sm text-[hsl(var(--muted-foreground))]">
-                    {formatNum(user.todayRequests)} req /{" "}
-                    {formatNum(user.todayTokens)} tok
-                  </TableCell>
-                  <TableCell className="max-w-xs truncate text-sm text-[hsl(var(--muted-foreground))]">
+                    </span>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className="inline-flex items-center justify-center min-w-[28px] h-6 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-xs font-semibold rounded-md px-2">
+                      {user.modelCount}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs whitespace-nowrap">
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{formatNum(user.todayRequests)}</span> req /{" "}
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{formatNum(user.todayTokens)}</span> tok
+                  </td>
+                  <td className="py-3 px-4 max-w-[140px] truncate text-xs text-slate-400 dark:text-slate-500 italic">
                     {user.remark || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center justify-end gap-0.5">
                       <Link href={`/admin/users/${user.id}`}>
-                        <Button variant="ghost" size="icon" title="Edit">
-                          <Pencil className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Edit"
+                          className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
                       <Button
@@ -257,56 +294,70 @@ export default function UsersPage() {
                         title="Approve"
                         disabled={user.isActive}
                         onClick={() => handleApprove(user.id, user.name)}
+                        className="h-8 w-8 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-30"
                       >
-                        <Check className="h-4 w-4 text-green-600" />
+                        <Check className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         title="Regenerate key"
                         onClick={() => handleRegenerateKey(user.id)}
+                        className="h-8 w-8 text-slate-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30"
                       >
-                        <RefreshCw className="h-4 w-4" />
+                        <RefreshCw className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         title="Delete"
                         onClick={() => handleDelete(user.id, user.name)}
+                        className="h-8 w-8 text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                       >
-                        <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))
             )}
-          </TableBody>
-        </Table>
+          </tbody>
+        </table>
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of{" "}
-            {total} users
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Showing{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">
+              {(page - 1) * limit + 1}–{Math.min(page * limit, total)}
+            </span>{" "}
+            of{" "}
+            <span className="font-medium text-slate-700 dark:text-slate-300">{total}</span>{" "}
+            users
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1">
             <Button
               variant="outline"
               size="sm"
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
+              className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
-              Previous
+              <ChevronLeft className="h-4 w-4" />
             </Button>
+            <span className="text-sm text-slate-600 dark:text-slate-400 px-2">
+              {page} / {totalPages}
+            </span>
             <Button
               variant="outline"
               size="sm"
               disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
+              className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
-              Next
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -314,3 +365,4 @@ export default function UsersPage() {
     </div>
   );
 }
+
