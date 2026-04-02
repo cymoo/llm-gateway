@@ -16,9 +16,21 @@ export async function middleware(req: NextRequest) {
     }
   }
 
+  // Protect /dashboard route
+  if (pathname.startsWith("/dashboard")) {
+    const token = req.cookies.get("user_token")?.value;
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    const payload = await verifyJWT(token);
+    if (!payload) {
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*"],
 };
