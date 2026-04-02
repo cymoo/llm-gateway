@@ -7,7 +7,7 @@ import {
   userModelQuotas,
   dailyUsage,
 } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { getAuthUser, unauthorizedResponse } from "@/app/api/auth/middleware";
 
 export async function GET(req: NextRequest) {
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       .where(
         and(
           eq(userModelQuotas.userId, userId),
-          sql`${userModelQuotas.modelId} = ANY(${modelIds})`
+          inArray(userModelQuotas.modelId, modelIds)
         )
       );
   }
@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
           and(
             eq(dailyUsage.userId, userId),
             sql`${dailyUsage.date} = ${today}`,
-            sql`${dailyUsage.modelId} = ANY(${modelIds})`
+            inArray(dailyUsage.modelId, modelIds)
           )
         )
     : [];
@@ -167,8 +167,10 @@ export async function GET(req: NextRequest) {
   });
 
   const host = process.env.HOST || req.headers.get("host") || "localhost:3000";
-  const protocol = host.startsWith("localhost") ? "http" : "https";
-  const baseUrl = `${protocol}://${host}/api/v1`;
+  const proto =
+    req.headers.get("x-forwarded-proto") ||
+    (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+  const baseUrl = `${proto}://${host}/api/v1`;
 
   return Response.json({
     user: {
