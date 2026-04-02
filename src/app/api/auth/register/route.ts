@@ -2,10 +2,11 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { generateApiKey } from "@/lib/utils/api-key";
-import { validateEmail } from "@/lib/utils/validators";
+import { validateEmail, validateAdminPassword } from "@/lib/utils/validators";
+import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
-  const { name, email } = await req.json();
+  const { name, email, password } = await req.json();
 
   const normalizedName = typeof name === "string" ? name.trim() : "";
   const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
@@ -22,13 +23,26 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid email format" }, { status: 400 });
   }
 
+  if (!password || typeof password !== "string") {
+    return Response.json({ error: "Password is required" }, { status: 400 });
+  }
+
+  if (!validateAdminPassword(password)) {
+    return Response.json(
+      { error: "Invalid password: use 8-128 printable ASCII characters without spaces" },
+      { status: 400 }
+    );
+  }
+
   const apiKey = generateApiKey();
+  const passwordHash = await bcrypt.hash(password, 10);
 
   try {
     await db.insert(users).values({
       name: normalizedName,
       email: normalizedEmail,
       apiKey,
+      passwordHash,
       isActive: false,
       isAdmin: false,
     });
@@ -42,9 +56,12 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  const adminName = process.env.ADMIN_NAME || "admin";
+
   return Response.json(
     {
       message: "Registration submitted and pending admin approval",
+      adminName,
       data: {
         email: normalizedEmail,
         status: "pending_approval",

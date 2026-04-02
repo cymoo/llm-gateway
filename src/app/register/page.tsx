@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function RegisterPage() {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email }),
+        body: JSON.stringify({ name, email, password }),
       });
 
       const data = await res.json().catch(() => null);
@@ -34,11 +35,13 @@ export default function RegisterPage() {
         return;
       }
 
+      const adminName = data?.adminName || "admin";
       setSuccess(
-        "Registration submitted successfully. Please wait for admin approval."
+        `Registration submitted successfully. Please wait for ${adminName} approval.`
       );
       setName("");
       setEmail("");
+      setPassword("");
     } catch {
       setError("Network error");
     } finally {
@@ -80,6 +83,17 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Choose a password"
                   required
                 />
               </div>

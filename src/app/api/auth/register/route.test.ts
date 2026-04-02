@@ -15,6 +15,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("bcryptjs", () => ({
+  default: {
+    hash: vi.fn().mockResolvedValue("hashed_password"),
+  },
+}));
+
 import { POST } from "./route";
 
 describe("POST /api/auth/register", () => {
@@ -25,7 +31,7 @@ describe("POST /api/auth/register", () => {
 
   it("creates a pending user with normalized email", async () => {
     const req = {
-      json: async () => ({ name: " Alice ", email: "Alice@Example.COM " }),
+      json: async () => ({ name: " Alice ", email: "Alice@Example.COM ", password: "Password1!" }),
     };
     const res = await POST(req as never);
     const body = await res.json();
@@ -33,6 +39,7 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(201);
     expect(body.message).toContain("pending admin approval");
     expect(body.data.status).toBe("pending_approval");
+    expect(body.adminName).toBe("admin");
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     const values = mockInsertValues.mock.calls[0][0];
@@ -41,11 +48,12 @@ describe("POST /api/auth/register", () => {
     expect(values.isActive).toBe(false);
     expect(values.isAdmin).toBe(false);
     expect(values.apiKey).toBeTypeOf("string");
+    expect(values.passwordHash).toBe("hashed_password");
   });
 
   it("rejects invalid email", async () => {
     const req = {
-      json: async () => ({ name: "Alice", email: "not-an-email" }),
+      json: async () => ({ name: "Alice", email: "not-an-email", password: "Password1!" }),
     };
     const res = await POST(req as never);
     const body = await res.json();
@@ -55,10 +63,34 @@ describe("POST /api/auth/register", () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
+  it("rejects missing password", async () => {
+    const req = {
+      json: async () => ({ name: "Alice", email: "alice@example.com" }),
+    };
+    const res = await POST(req as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Password is required");
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid password", async () => {
+    const req = {
+      json: async () => ({ name: "Alice", email: "alice@example.com", password: "short" }),
+    };
+    const res = await POST(req as never);
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Invalid password");
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
   it("returns conflict for duplicate email", async () => {
     mockInsertValues.mockRejectedValue(new Error("duplicate key value violates unique constraint"));
     const req = {
-      json: async () => ({ name: "Alice", email: "alice@example.com" }),
+      json: async () => ({ name: "Alice", email: "alice@example.com", password: "Password1!" }),
     };
     const res = await POST(req as never);
     const body = await res.json();
