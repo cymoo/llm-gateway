@@ -36,13 +36,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const willBeAdmin = isAdmin ?? existingUser.isAdmin;
   const hasPassword = typeof password === "string" && password.length > 0;
 
-  if (hasPassword && !willBeAdmin) {
-    return Response.json(
-      { error: "Password can only be set for admin users" },
-      { status: 400 }
-    );
-  }
-
   if (willBeAdmin && !existingUser.passwordHash && !hasPassword) {
     return Response.json(
       { error: "Password is required when enabling admin access" },

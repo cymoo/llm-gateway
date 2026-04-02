@@ -495,58 +495,61 @@ export default function UserDetailPage() {
         </div>
       </SectionCard>
 
-      {/* Password Settings — only shown for admin users */}
-      {initialIsAdmin && (
-        <SectionCard title="Password Settings" icon={KeyRound}>
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Update the admin login password. Leave blank to keep the current
-              password.
+      {/* Password Settings */}
+      <SectionCard title="Password Settings" icon={KeyRound}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Update the login password for this user. Leave blank to keep the
+            current password.
+          </p>
+          {user.isAdmin && (
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              This password can also be used for admin login.
             </p>
-            <div className="space-y-2">
-              <Label
-                htmlFor="adminPassword"
-                className="text-slate-700 dark:text-slate-300"
-              >
-                New Password
-              </Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="adminPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter new password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
-                8–128 printable ASCII characters, no spaces
-              </p>
-            </div>
-            <Button
-              onClick={handleSavePassword}
-              disabled={savingPassword || !password}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0"
+          )}
+          <div className="space-y-2">
+            <Label
+              htmlFor="adminPassword"
+              className="text-slate-700 dark:text-slate-300"
             >
-              {savingPassword ? "Saving…" : "Update Password"}
-            </Button>
+              New Password
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="adminPassword"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter new password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-slate-400 dark:text-slate-500">
+              8–128 printable ASCII characters, no spaces
+            </p>
           </div>
-        </SectionCard>
-      )}
+          <Button
+            onClick={handleSavePassword}
+            disabled={savingPassword || !password}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0"
+          >
+            {savingPassword ? "Saving…" : "Update Password"}
+          </Button>
+        </div>
+      </SectionCard>
 
       {/* Authorized Models */}
       <SectionCard
