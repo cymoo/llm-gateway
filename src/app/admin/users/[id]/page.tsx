@@ -499,7 +499,8 @@ export default function UserDetailPage() {
       <SectionCard title="Password Settings" icon={KeyRound}>
         <div className="space-y-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Update the login password for this user.
+            Update the login password for this user. Leave blank to keep the
+            current password.
           </p>
           {user.isAdmin && (
             <p className="text-xs text-slate-400 dark:text-slate-500">
