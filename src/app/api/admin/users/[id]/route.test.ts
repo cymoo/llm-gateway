@@ -102,4 +102,16 @@ describe("PUT /api/admin/users/[id]", () => {
     const updates = mockUpdateSet.mock.calls[0][0];
     expect(updates.remark).toBe("vip user");
   });
+
+  it("hashes password for non-admin users when provided", async () => {
+    const req = { json: async () => ({ password: "Valid#Pass123" }) };
+    const res = await PUT(req as never, { params: Promise.resolve({ id: "user-1" }) });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    const updates = mockUpdateSet.mock.calls[0][0];
+    expect(updates.isAdmin).toBeUndefined();
+    expect(updates.passwordHash).toBeTypeOf("string");
+    expect(updates.passwordHash).not.toBe("Valid#Pass123");
+  });
 });
