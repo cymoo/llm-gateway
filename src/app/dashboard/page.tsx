@@ -209,10 +209,22 @@ export default function DashboardPage() {
     .map((m) => m.alias);
   const firstModel = modelAliases[0] || "your-model";
 
+  const baseUrlHost = (() => {
+    try {
+      return new URL(data.baseUrl).hostname;
+    } catch {
+      return "";
+    }
+  })();
+  const defaultNoProxy = "localhost;127.0.0.1";
+  const noProxy = baseUrlHost && !defaultNoProxy.split(";").includes(baseUrlHost)
+    ? `${defaultNoProxy};${baseUrlHost}`
+    : defaultNoProxy;
+
   const nonStreamCode = `import os
 from openai import OpenAI
 
-os.environ['no_proxy'] = 'localhost;127.0.0.1'
+os.environ['no_proxy'] = '${noProxy}'
 
 client = OpenAI(
     base_url="${data.baseUrl}",
@@ -231,7 +243,7 @@ print(response.choices[0].message.content)`;
   const streamCode = `import os
 from openai import OpenAI
 
-os.environ['no_proxy'] = 'localhost;127.0.0.1'
+os.environ['no_proxy'] = '${noProxy}'
 
 client = OpenAI(
     base_url="${data.baseUrl}",
