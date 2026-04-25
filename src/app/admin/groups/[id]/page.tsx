@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface Group {
   id: string;
@@ -340,18 +341,13 @@ export default function GroupDetailPage() {
         icon={UserPlus}
         action={
           <div className="flex items-center gap-2">
-            <select
+            <SearchableSelect
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 min-w-[180px]"
-            >
-              <option value="">Select user…</option>
-              {nonMembers.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.email})
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedUserId}
+              options={nonMembers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
+              placeholder="Select user…"
+              className="min-w-[200px]"
+            />
             <Button
               size="sm"
               onClick={handleAddMember}

@@ -32,6 +32,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 interface UserStat {
   userId: string;
@@ -397,21 +398,13 @@ export default function UsagePage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label>User</Label>
-                  <select
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                  <SearchableSelect
                     value={userFilter}
-                    onChange={(e) => {
-                      setLogsPage(1);
-                      setUserFilter(e.target.value);
-                    }}
-                  >
-                    <option value="">All users</option>
-                    {userOptions.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name || u.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => { setLogsPage(1); setUserFilter(v); }}
+                    options={userOptions.map((u) => ({ value: u.id, label: u.name || u.id }))}
+                    placeholder="All users"
+                    className="w-full"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label>IP</Label>
