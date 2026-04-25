@@ -28,8 +28,20 @@ export async function GET(req: NextRequest) {
       .from(users)
       .where(conditions),
     db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        apiKey: users.apiKey,
+        remark: users.remark,
+        isActive: users.isActive,
+        isAdmin: users.isAdmin,
+        createdAt: users.createdAt,
+        groupId: users.groupId,
+        groupName: groups.name,
+      })
       .from(users)
+      .leftJoin(groups, eq(users.groupId, groups.id))
       .where(conditions)
       .orderBy(users.createdAt)
       .limit(limit)
@@ -84,6 +96,8 @@ export async function GET(req: NextRequest) {
     isActive: u.isActive,
     isAdmin: u.isAdmin,
     createdAt: u.createdAt,
+    groupId: u.groupId,
+    groupName: u.groupName,
     modelCount: modelCountMap.get(u.id) || 0,
     todayTokens: usageMap.get(u.id)?.totalTokens || 0,
     todayRequests: usageMap.get(u.id)?.requestCount || 0,
