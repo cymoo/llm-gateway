@@ -9,7 +9,7 @@ import {
   Trash2,
   RefreshCw,
   Copy,
-  Check,
+  LayoutDashboard,
   Users,
   ShieldCheck,
   ChevronLeft,
@@ -27,6 +27,8 @@ interface User {
   email: string;
   apiKey: string;
   remark?: string | null;
+  groupId?: string | null;
+  groupName?: string | null;
   isActive: boolean;
   isAdmin: boolean;
   createdAt: string;
@@ -118,18 +120,6 @@ export default function UsersPage() {
     }
   };
 
-  const handleApprove = async (id: string, name: string) => {
-    if (!confirm(`Approve user "${name}"?`)) return;
-    const res = await fetch(`/api/admin/users/${id}/approve`, { method: "POST" });
-    if (res.ok) {
-      toast({ title: "User approved" });
-      fetchUsers();
-    } else {
-      const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
-    }
-  };
-
   const handleCopyKey = async (apiKey: string) => {
     const ok = await copyToClipboard(apiKey);
     toast({
@@ -190,7 +180,7 @@ export default function UsersPage() {
               <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
               <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Models</th>
               <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Today</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Remark</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Group</th>
               <th className="text-right py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
             </tr>
           </thead>
@@ -273,8 +263,17 @@ export default function UsersPage() {
                     <span className="font-medium text-slate-700 dark:text-slate-300">{formatNum(user.todayRequests)}</span> req /{" "}
                     <span className="font-medium text-slate-700 dark:text-slate-300">{formatNum(user.todayTokens)}</span> tok
                   </td>
-                  <td className="py-3 px-4 max-w-[140px] truncate text-xs text-slate-400 dark:text-slate-500 italic">
-                    {user.remark || "—"}
+                  <td className="py-3 px-4 max-w-[140px] truncate text-xs">
+                    {user.groupId ? (
+                      <Link
+                        href={`/admin/groups/${user.groupId}`}
+                        className="text-violet-600 dark:text-violet-400 hover:underline"
+                      >
+                        {user.groupName || "—"}
+                      </Link>
+                    ) : (
+                      <span className="text-slate-400 dark:text-slate-500">—</span>
+                    )}
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-0.5">
@@ -288,16 +287,16 @@ export default function UsersPage() {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Approve"
-                        disabled={user.isActive}
-                        onClick={() => handleApprove(user.id, user.name)}
-                        className="h-8 w-8 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-30"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                      </Button>
+                      <Link href="/dashboard" target="_blank">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="View Dashboard"
+                          className="h-8 w-8 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                        >
+                          <LayoutDashboard className="h-3.5 w-3.5" />
+                        </Button>
+                      </Link>
                       <Button
                         variant="ghost"
                         size="icon"

@@ -413,6 +413,7 @@ export default function GroupDetailPage() {
       <SectionCard
         title="Model Access & Quotas"
         action={
+          group.isDefault ? undefined :
           <div className="flex items-center gap-2">
             <select
               value={selectedModelId}
@@ -438,6 +439,14 @@ export default function GroupDetailPage() {
           </div>
         }
       >
+        {group.isDefault && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            <span className="mt-0.5 shrink-0">⚠️</span>
+            <span>
+              Users in the <strong>Default</strong> group use their own individual model access and quota settings, not these group-level settings. The configuration below has no effect.
+            </span>
+          </div>
+        )}
         {groupModels.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">No models added yet</p>
         ) : (
