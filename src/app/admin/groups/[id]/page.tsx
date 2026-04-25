@@ -70,7 +70,7 @@ function SectionCard({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/60 shadow-sm overflow-hidden">
+    <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/60 shadow-sm">
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/60 dark:border-slate-700/60">
         <div className="flex items-center gap-2">
           {Icon && <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
@@ -348,7 +348,7 @@ export default function GroupDetailPage() {
             <SearchableSelect
               value={selectedUserId}
               onChange={setSelectedUserId}
-              options={nonMembers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
+              options={nonMembers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})`, searchText: `${u.name} ${u.email}` }))}
               placeholder={t("groups.selectUser")}
               className="min-w-[200px]"
             />

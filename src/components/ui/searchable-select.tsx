@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 export interface SearchableSelectOption {
   value: string;
   label: string;
+  /** Optional extra text used for matching (e.g. email). Falls back to label. */
+  searchText?: string;
 }
 
 interface SearchableSelectProps {
@@ -30,8 +32,9 @@ export function SearchableSelect({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((o) => o.value === value);
-  const filtered = search
-    ? options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+  const q = search.toLowerCase();
+  const filtered = q
+    ? options.filter((o) => (o.searchText ?? o.label).toLowerCase().includes(q))
     : options;
 
   useEffect(() => {
@@ -63,7 +66,7 @@ export function SearchableSelect({
       </button>
 
       {open && (
-        <div className="absolute z-50 top-full mt-1 w-full min-w-[200px] rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
+        <div className="absolute z-50 top-full mt-1 left-0 min-w-[280px] w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg">
           <div className="p-2 border-b border-slate-100 dark:border-slate-700/60">
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
@@ -85,7 +88,7 @@ export function SearchableSelect({
               )}
               onClick={() => { onChange(""); setOpen(false); setSearch(""); }}
             >
-              {placeholder}
+              <span className="block truncate">{placeholder}</span>
             </button>
             {filtered.length === 0 ? (
               <div className="px-3 py-4 text-sm text-center text-slate-400">No results</div>
@@ -100,7 +103,7 @@ export function SearchableSelect({
                   )}
                   onClick={() => { onChange(o.value); setOpen(false); setSearch(""); }}
                 >
-                  {o.label}
+                  <span className="block truncate">{o.label}</span>
                 </button>
               ))
             )}
@@ -110,3 +113,4 @@ export function SearchableSelect({
     </div>
   );
 }
+
