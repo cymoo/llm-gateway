@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-04-25
+
+### 🐛 Bug Fixes
+
+- **Admin groups page** — the user select dropdown was being clipped by its parent card's `overflow-hidden`, making it appear as a tiny sliver with an unusable search box. Removed `overflow-hidden` from the `SectionCard` wrapper to fix the root cause.
+- **SearchableSelect** — option labels now truncate with an ellipsis instead of wrapping; dropdown has a minimum width of 280 px to comfortably display `"Name (email)"` entries. Added an optional `searchText` field so callers can provide a plain `"name email"` string for matching independently of the display label.
+
+---
+
 ## [0.1.1] - 2026-04-25
 
 ### Infrastructure
