@@ -1,20 +1,14 @@
 #!/usr/bin/env node
 /**
- * 中文 Changelog 生成器（基于 LLM）
+ * 中文 Changelog 生成器（机械模式）
  *
- * 解析 git log，将提交内容发送给 LLM，生成高质量、易读的中文 Changelog。
- * 支持任何 OpenAI 兼容接口，可通过环境变量配置（包括本项目自身的 gateway）。
- *
- * 环境变量：
- *   LLM_API_URL   — API 基础 URL（默认 https://api.openai.com/v1）
- *   LLM_API_KEY   — API 密钥（默认 OPENAI_API_KEY 环境变量）
- *   LLM_MODEL     — 模型名称（默认 gpt-4o-mini）
+ * 解析 git log，按提交类型分组，输出结构化中文 Markdown。
+ * 适用于自动化流水线兜底；如需高质量内容，直接向 Copilot/AI 提问即可。
  *
  * 用法：
  *   node scripts/generate-changelog-zh.mjs --version v0.2.0 --from v0.1.0
  *   node scripts/generate-changelog-zh.mjs --version v0.1.0          # 全部历史
  *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --stdout # 预览到 stdout
- *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --no-llm # 跳过 LLM，用机械生成
  */
 
 import { execFileSync } from 'child_process';
@@ -38,21 +32,20 @@ const TYPE_MAP = {
   revert:   '⏪ 回滚',
 };
 
-// ── 参数解析 ────────────────────────────────────────────────────────────────
+// ── 参数解析 ─────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { useLlm: true };
+  const args = {};
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--from')        args.from = argv[++i];
-    else if (argv[i] === '--to')     args.to = argv[++i];
+    if (argv[i] === '--from')         args.from = argv[++i];
+    else if (argv[i] === '--to')      args.to = argv[++i];
     else if (argv[i] === '--version') args.version = argv[++i];
-    else if (argv[i] === '--stdout') args.stdout = true;
-    else if (argv[i] === '--no-llm') args.useLlm = false;
+    else if (argv[i] === '--stdout')  args.stdout = true;
   }
   return args;
 }
 
-// ── Git 解析 ────────────────────────────────────────────────────────────────
+// ── Git 解析 ─────────────────────────────────────────────────────────────────
 
 function getCommits(from, to = 'HEAD') {
   const range = from ? `${from}..${to}` : to;
@@ -95,70 +88,7 @@ function parseCommit(commit) {
   return { ...commit, type, scope, desc, isBreaking };
 }
 
-// ── LLM 生成 ────────────────────────────────────────────────────────────────
-
-async function generateWithLlm(version, date, parsedCommits) {
-  const apiUrl = (process.env.LLM_API_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
-  const apiKey = process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY;
-  const model  = process.env.LLM_MODEL ?? 'gpt-4o-mini';
-
-  if (!apiKey) {
-    console.warn('[changelog-zh] 未设置 LLM_API_KEY，回退到机械生成模式。');
-    return null;
-  }
-
-  const commitLines = parsedCommits.map((c) => {
-    const scope = c.scope ? `(${c.scope})` : '';
-    const breaking = c.isBreaking ? ' [BREAKING]' : '';
-    return `${c.type}${scope}${breaking}: ${c.desc}${c.body ? '\n  > ' + c.body.split('\n').join('\n  > ') : ''}`;
-  }).join('\n');
-
-  const prompt = `你是一位技术写作专家，负责为一个开源项目编写高质量的中文 Changelog。
-
-项目介绍：这是一个 Next.js 实现的 OpenAI 兼容 API 代理网关（LLM Gateway），面向企业/团队，
-提供用户管理、分组权限、配额控制、使用量统计等功能，管理员通过 Web 后台管理，普通用户通过仪表盘查看使用情况。
-
-请根据以下 git 提交记录，为版本 ${version}（发布日期：${date}）编写一份**高质量、易读**的中文 Changelog。
-
-要求：
-- 将相关提交合并、归纳，用自然语言描述功能变更，而不是逐条列出提交信息
-- 按功能领域（而非提交类型）组织内容，使用清晰的小标题
-- 用中文技术写作风格，简洁而信息密度高
-- 输出纯 Markdown，不要加代码块包裹
-- 使用 emoji 图标让标题更醒目（✨ 新增 / 🐛 修复 / ⚡ 改进 / 📝 文档 / 🔧 工程）
-- 只输出版本内容部分（从 ### 小标题开始），不要输出 ## [版本] 标题行
-- 不要包含任何前言或解释性文字，直接输出 Markdown 内容
-
-提交记录：
-${commitLines}`;
-
-  process.stderr.write('[changelog-zh] 正在调用 LLM 生成中文 Changelog...\n');
-
-  const res = await fetch(`${apiUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-    }),
-    signal: AbortSignal.timeout(60000),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.warn(`[changelog-zh] LLM 调用失败 (HTTP ${res.status})，回退到机械生成模式。\n${text}`);
-    return null;
-  }
-
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content?.trim() ?? null;
-}
-
-// ── 机械生成（兜底） ─────────────────────────────────────────────────────────
+// ── 格式化 ───────────────────────────────────────────────────────────────────
 
 function formatEntry(parsed) {
   const scope = parsed.scope ? `**${parsed.scope}**: ` : '';
@@ -166,15 +96,17 @@ function formatEntry(parsed) {
   return `- ${scope}${parsed.desc} (\`${hash}\`)`;
 }
 
-function buildFallbackSection(parsedCommits) {
-  const breaking = parsedCommits.filter((c) => c.isBreaking);
+function buildSection(version, date, commits) {
+  const parsed = commits.map(parseCommit).filter(Boolean);
+
+  const breaking = parsed.filter((c) => c.isBreaking);
   const byType = {};
-  for (const c of parsedCommits) {
+  for (const c of parsed) {
     if (!byType[c.type]) byType[c.type] = [];
     byType[c.type].push(c);
   }
 
-  const lines = [];
+  const lines = [`## [${version}] - ${date}`, ''];
 
   if (breaking.length) {
     lines.push('### ⚠️ 破坏性变更', '');
@@ -193,7 +125,7 @@ function buildFallbackSection(parsedCommits) {
   return lines.join('\n');
 }
 
-// ── 文件写入 ────────────────────────────────────────────────────────────────
+// ── 文件写入 ─────────────────────────────────────────────────────────────────
 
 function prependToFile(filePath, section) {
   const HEADER =
@@ -213,7 +145,7 @@ function prependToFile(filePath, section) {
   }
 }
 
-// ── 主程序 ──────────────────────────────────────────────────────────────────
+// ── 主程序 ───────────────────────────────────────────────────────────────────
 
 const args = parseArgs(process.argv.slice(2));
 const version = args.version ?? 'Unreleased';
@@ -225,17 +157,7 @@ if (commits.length === 0) {
   process.exit(0);
 }
 
-const parsedCommits = commits.map(parseCommit).filter(Boolean);
-
-let bodyContent;
-if (args.useLlm) {
-  bodyContent = await generateWithLlm(version, date, parsedCommits);
-}
-if (!bodyContent) {
-  bodyContent = buildFallbackSection(parsedCommits);
-}
-
-const section = `## [${version}] - ${date}\n\n${bodyContent}`;
+const section = buildSection(version, date, commits);
 
 if (args.stdout) {
   console.log(section);

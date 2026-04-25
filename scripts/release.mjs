@@ -168,7 +168,7 @@ async function main() {
     '--version', tagName,
   ];
   if (lastTag) zhArgs.push('--from', lastTag);
-  if (isDryRun) zhArgs.push('--stdout', '--no-llm');
+  if (isDryRun) zhArgs.push('--stdout');
 
   const zhResult = spawnSync(zhArgs[0], zhArgs.slice(1), {
     cwd: ROOT,
