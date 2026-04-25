@@ -33,6 +33,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useLanguage } from "@/lib/i18n";
 
 interface UserStat {
   userId: string;
@@ -112,6 +113,8 @@ export default function UsagePage() {
   const [modelOptions, setModelOptions] = useState<FilterOption[]>([]);
 
   const logsLimit = 50;
+
+  const { t } = useLanguage();
 
   const exportLogsCsv = async () => {
     const { startDate, endDate } = dateRange;
@@ -193,9 +196,9 @@ export default function UsagePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Usage Statistics</h1>
+        <h1 className="text-2xl font-bold">{t("usage.title")}</h1>
         <p className="text-[hsl(var(--muted-foreground))]">
-          Monitor API usage across users and models
+          {t("usage.subtitle")}
         </p>
       </div>
 
@@ -205,7 +208,7 @@ export default function UsagePage() {
           <div className="flex items-center gap-4">
             <BarChart3 className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
             <div className="flex items-center gap-2">
-              <Label>From</Label>
+              <Label>{t("usage.from")}</Label>
               <Input
                 type="date"
                 className="w-40"
@@ -216,7 +219,7 @@ export default function UsagePage() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <Label>To</Label>
+              <Label>{t("usage.to")}</Label>
               <Input
                 type="date"
                 className="w-40"
@@ -227,7 +230,7 @@ export default function UsagePage() {
               />
             </div>
             <Button variant="outline" size="sm" onClick={fetchData}>
-              Refresh
+              {t("usage.refresh")}
             </Button>
           </div>
         </CardContent>
@@ -235,9 +238,9 @@ export default function UsagePage() {
 
       <Tabs value={tab} onValueChange={(v) => { setTab(v); setLogsPage(1); }}>
         <TabsList>
-          <TabsTrigger value="by-user">By User</TabsTrigger>
-          <TabsTrigger value="by-model">By Model</TabsTrigger>
-          <TabsTrigger value="logs">Request Logs</TabsTrigger>
+          <TabsTrigger value="by-user">{t("usage.byUser")}</TabsTrigger>
+          <TabsTrigger value="by-model">{t("usage.byModel")}</TabsTrigger>
+          <TabsTrigger value="logs">{t("usage.requestLogs")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="by-user" className="space-y-4">
@@ -246,7 +249,7 @@ export default function UsagePage() {
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Token Usage by User</CardTitle>
+                    <CardTitle>{t("usage.tokenByUser")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={200}>
@@ -262,7 +265,7 @@ export default function UsagePage() {
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Request Count by User</CardTitle>
+                    <CardTitle>{t("usage.reqByUser")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={200}>
@@ -283,23 +286,23 @@ export default function UsagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
-                  <TableHead className="text-right">Total Tokens</TableHead>
+                  <TableHead>{t("usage.user")}</TableHead>
+                  <TableHead>{t("usage.email")}</TableHead>
+                  <TableHead className="text-right">{t("usage.requests")}</TableHead>
+                  <TableHead className="text-right">{t("usage.totalTokens")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      Loading...
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : userStats.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      No data for this period
+                      {t("usage.noData")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -323,7 +326,7 @@ export default function UsagePage() {
               <>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Token Usage by Model</CardTitle>
+                    <CardTitle>{t("usage.tokenByModel")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={200}>
@@ -339,7 +342,7 @@ export default function UsagePage() {
                 </Card>
                 <Card>
                   <CardHeader>
-                    <CardTitle>Request Count by Model</CardTitle>
+                    <CardTitle>{t("usage.reqByModel")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={200}>
@@ -360,22 +363,22 @@ export default function UsagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model</TableHead>
-                  <TableHead className="text-right">Requests</TableHead>
-                  <TableHead className="text-right">Total Tokens</TableHead>
+                  <TableHead>{t("usage.model")}</TableHead>
+                  <TableHead className="text-right">{t("usage.requests")}</TableHead>
+                  <TableHead className="text-right">{t("usage.totalTokens")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      Loading...
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : modelStats.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      No data for this period
+                      {t("usage.noData")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -397,17 +400,17 @@ export default function UsagePage() {
             <CardContent className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>User</Label>
+                  <Label>{t("usage.user")}</Label>
                   <SearchableSelect
                     value={userFilter}
                     onChange={(v) => { setLogsPage(1); setUserFilter(v); }}
                     options={userOptions.map((u) => ({ value: u.id, label: u.name || u.id }))}
-                    placeholder="All users"
+                    placeholder={t("usage.allUsers")}
                     className="w-full"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>IP</Label>
+                  <Label>{t("usage.ip")}</Label>
                   <Input
                     placeholder="e.g. 127.0.0.1"
                     value={ipFilter}
@@ -418,7 +421,7 @@ export default function UsagePage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Model</Label>
+                  <Label>{t("usage.model")}</Label>
                   <select
                     className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
                     value={modelFilter}
@@ -427,7 +430,7 @@ export default function UsagePage() {
                       setModelFilter(e.target.value);
                     }}
                   >
-                    <option value="">All models</option>
+                    <option value="">{t("usage.allModels")}</option>
                     {modelOptions.map((m) => (
                       <option key={m.id} value={m.id}>
                         {m.alias || m.id}
@@ -441,21 +444,21 @@ export default function UsagePage() {
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={exportLogsCsv}>
               <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              {t("usage.exportCsv")}
             </Button>
           </div>
           <div className="rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Time</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead>Model</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Prompt</TableHead>
-                  <TableHead className="text-right">Tokens</TableHead>
-                  <TableHead className="text-right">Duration</TableHead>
+                  <TableHead>{t("usage.time")}</TableHead>
+                  <TableHead>{t("usage.user")}</TableHead>
+                  <TableHead>{t("usage.ip")}</TableHead>
+                  <TableHead>{t("usage.model")}</TableHead>
+                  <TableHead>{t("usage.type")}</TableHead>
+                  <TableHead>{t("usage.prompt")}</TableHead>
+                  <TableHead className="text-right">{t("usage.tokens")}</TableHead>
+                  <TableHead className="text-right">{t("usage.duration")}</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -463,13 +466,13 @@ export default function UsagePage() {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      Loading...
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : logs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                      No logs for this period
+                      {t("usage.noLogs")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -498,7 +501,7 @@ export default function UsagePage() {
                           <button
                             type="button"
                             className="text-left cursor-pointer hover:text-[hsl(var(--primary))] w-full"
-                            title="Click to view full prompt"
+                            title={t("usage.clickToView")}
                             onClick={() => setSelectedLog(log)}
                           >
                             <span className="truncate block">
@@ -534,8 +537,11 @@ export default function UsagePage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                Showing {(logsPage - 1) * logsLimit + 1}–{Math.min(logsPage * logsLimit, logsTotal)} of{" "}
-                {logsTotal} logs
+                {t("usage.showingLogs", {
+                  from: (logsPage - 1) * logsLimit + 1,
+                  to: Math.min(logsPage * logsLimit, logsTotal),
+                  total: logsTotal,
+                })}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -544,7 +550,7 @@ export default function UsagePage() {
                   disabled={logsPage === 1}
                   onClick={() => setLogsPage((p) => p - 1)}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="outline"
@@ -552,7 +558,7 @@ export default function UsagePage() {
                   disabled={logsPage === totalPages}
                   onClick={() => setLogsPage((p) => p + 1)}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -563,11 +569,11 @@ export default function UsagePage() {
       <Dialog open={selectedLog !== null} onOpenChange={(open) => !open && setSelectedLog(null)}>
         <DialogContent className="max-w-4xl w-[90vw]">
           <DialogHeader>
-            <DialogTitle>Full Prompt</DialogTitle>
+            <DialogTitle>{t("usage.fullPrompt")}</DialogTitle>
             <DialogDescription>
               {selectedLog?.createdAt
-                ? `Request at ${new Date(selectedLog.createdAt).toLocaleString()}`
-                : "Request prompt content"}
+                ? t("usage.requestAt", { time: new Date(selectedLog.createdAt).toLocaleString() })
+                : t("usage.requestPromptContent")}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto rounded-md border p-3">

@@ -16,6 +16,7 @@ import {
   Shield,
   Code,
   Users2,
+  Languages,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { copyToClipboard } from "@/lib/utils/clipboard";
+import { useLanguage } from "@/lib/i18n";
 
 interface ModelInfo {
   alias: string;
@@ -80,6 +82,7 @@ function formatTooltipNumber(value: unknown): string {
 }
 
 function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) {
+  const { t } = useLanguage();
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -95,7 +98,7 @@ function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) 
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-          Base URL:
+          {t("userDashboard.baseUrl")}
         </span>
         <code className="text-sm bg-[hsl(var(--muted))] px-2 py-1 rounded font-mono">
           {baseUrl}
@@ -103,7 +106,7 @@ function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) 
         <button
           onClick={() => handleCopy(baseUrl, "url")}
           className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-          title="Copy Base URL"
+          title={t("userDashboard.copyBaseUrl")}
         >
           {copied === "url" ? (
             <Check className="h-3.5 w-3.5 text-green-600" />
@@ -114,19 +117,19 @@ function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) 
       </div>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-          API Key:
+          {t("userDashboard.apiKey")}
         </span>
         <code
           className="text-sm bg-[hsl(var(--muted))] px-2 py-1 rounded font-mono cursor-pointer"
           onClick={() => setRevealed(!revealed)}
-          title="Click to toggle"
+          title={t("userDashboard.toggleVisibility")}
         >
           {revealed ? apiKey : apiKey.slice(0, 8) + "••••••••••••••••••••"}
         </code>
         <button
           onClick={() => handleCopy(apiKey, "key")}
           className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-          title="Copy API Key"
+          title={t("userDashboard.copyApiKey")}
         >
           {copied === "key" ? (
             <Check className="h-3.5 w-3.5 text-green-600" />
@@ -140,6 +143,7 @@ function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) 
 }
 
 function CodeBlock({ code, label }: { code: string; label: string }) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -162,11 +166,11 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3" /> Copied
+              <Check className="h-3 w-3" /> {t("common.copied")}
             </>
           ) : (
             <>
-              <Copy className="h-3 w-3" /> Copy
+              <Copy className="h-3 w-3" /> {t("common.copy")}
             </>
           )}
         </button>
@@ -180,6 +184,7 @@ function CodeBlock({ code, label }: { code: string; label: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { t, lang, setLang } = useLanguage();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -202,7 +207,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[hsl(var(--background))]">
-        <div className="text-[hsl(var(--muted-foreground))]">Loading...</div>
+        <div className="text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
       </div>
     );
   }
@@ -292,6 +297,10 @@ for chunk in stream:
                 </Badge>
               )}
             </div>
+            <Button variant="ghost" size="sm" onClick={() => setLang(lang === "en" ? "zh" : "en")}>
+              <Languages className="h-4 w-4 mr-1.5" />
+              {t("nav.switchLang")}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -299,7 +308,7 @@ for chunk in stream:
               className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <LogOut className="h-4 w-4 mr-1.5" />
-              Logout
+              {t("nav.logout")}
             </Button>
           </div>
         </div>
@@ -314,7 +323,7 @@ for chunk in stream:
               <User className="h-7 w-7 text-white" />
             </div>
             <div className="flex-1">
-              <p className="text-white/70 text-sm font-medium">Welcome back</p>
+              <p className="text-white/70 text-sm font-medium">{t("userDashboard.welcomeBack")}</p>
               <h1 className="text-2xl font-bold">{data.user.name}</h1>
               <div className="flex items-center gap-2 mt-1">
                 <Mail className="h-3.5 w-3.5 text-white/60" />
@@ -328,7 +337,7 @@ for chunk in stream:
                   <span className="inline-flex items-center gap-1 text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium">
                     <Users2 className="h-3 w-3" />
                     {data.group.name}
-                    {data.group.isDefault ? " (Default)" : ""}
+                    {data.group.isDefault ? t("userDashboard.defaultSuffix") : ""}
                   </span>
                 )}
               </div>
@@ -340,14 +349,14 @@ for chunk in stream:
         <div>
           <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Usage Statistics
+            {t("userDashboard.usageStatistics")}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div className="relative overflow-hidden rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-amber-50 p-5 dark:border-orange-900/30 dark:from-orange-950/30 dark:to-amber-950/30">
               <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-orange-100/80 dark:bg-orange-900/30 flex items-center justify-center">
                 <Coins className="h-5 w-5 text-orange-500" />
               </div>
-              <p className="text-sm text-orange-600/80 dark:text-orange-400/80 font-medium">Today&apos;s Tokens</p>
+              <p className="text-sm text-orange-600/80 dark:text-orange-400/80 font-medium">{t("userDashboard.todayTokens")}</p>
               <p className="text-3xl font-bold text-orange-700 dark:text-orange-300 mt-1">
                 {formatNum(data.today.totalTokens)}
               </p>
@@ -356,7 +365,7 @@ for chunk in stream:
               <div className="absolute top-3 right-3 w-10 h-10 rounded-full bg-blue-100/80 dark:bg-blue-900/30 flex items-center justify-center">
                 <Activity className="h-5 w-5 text-blue-500" />
               </div>
-              <p className="text-sm text-blue-600/80 dark:text-blue-400/80 font-medium">Today&apos;s Requests</p>
+              <p className="text-sm text-blue-600/80 dark:text-blue-400/80 font-medium">{t("userDashboard.todayRequests")}</p>
               <p className="text-3xl font-bold text-blue-700 dark:text-blue-300 mt-1">
                 {formatNum(data.today.requestCount)}
               </p>
@@ -368,7 +377,7 @@ for chunk in stream:
               <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-5 dark:border-slate-700/60 dark:bg-slate-800/50">
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-4 flex items-center gap-1.5">
                   <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
-                  7-Day Request Trend
+                  {t("userDashboard.requestTrend7d")}
                 </p>
                 <ResponsiveContainer width="100%" height={160}>
                   <LineChart data={data.dailyTrend}>
@@ -380,8 +389,8 @@ for chunk in stream:
                     />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip
-                      formatter={(value) => [formatTooltipNumber(value), "Requests"]}
-                      labelFormatter={(l) => `Date: ${l}`}
+                      formatter={(value) => [formatTooltipNumber(value), t("userDashboard.requests")]}
+                      labelFormatter={(l) => `${t("userDashboard.date")}: ${l}`}
                       contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px" }}
                     />
                     <Line
@@ -397,7 +406,7 @@ for chunk in stream:
               <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-5 dark:border-slate-700/60 dark:bg-slate-800/50">
                 <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-4 flex items-center gap-1.5">
                   <Coins className="h-3.5 w-3.5 text-orange-500" />
-                  7-Day Token Trend
+                  {t("userDashboard.tokenTrend7d")}
                 </p>
                 <ResponsiveContainer width="100%" height={160}>
                   <LineChart data={data.dailyTrend}>
@@ -409,8 +418,8 @@ for chunk in stream:
                     />
                     <YAxis tick={{ fontSize: 11 }} tickFormatter={formatNum} />
                     <Tooltip
-                      formatter={(value) => [formatTooltipNumber(value), "Tokens"]}
-                      labelFormatter={(l) => `Date: ${l}`}
+                      formatter={(value) => [formatTooltipNumber(value), t("userDashboard.tokens")]}
+                      labelFormatter={(l) => `${t("userDashboard.date")}: ${l}`}
                       contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px" }}
                     />
                     <Line
@@ -431,26 +440,26 @@ for chunk in stream:
         <div>
           <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            Quota &amp; Authorized Models
+            {t("userDashboard.quotaAndModels")}
           </h2>
           <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm overflow-hidden dark:border-slate-700/60 dark:bg-slate-800/50">
             {data.models.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                 <Bot className="h-10 w-10 mb-3 opacity-40" />
-                <p className="text-sm">No models authorized. Please contact admin.</p>
+                <p className="text-sm">{t("userDashboard.noModels")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Model</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Today Usage</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Tokens/Day</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Req/Day</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Req/Min</th>
-                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Time Window</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.model")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.status")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.todayUsage")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.tokensDay")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.reqDay")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.reqMin")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.timeWindow")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -469,7 +478,7 @@ for chunk in stream:
                               : "bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400"
                           }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${model.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
-                            {model.isActive ? "Active" : "Inactive"}
+                            {model.isActive ? t("userDashboard.active") : t("userDashboard.inactive")}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-slate-500 dark:text-slate-400">
@@ -488,7 +497,7 @@ for chunk in stream:
                         <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">
                           {model.quota.allowedTimeStart && model.quota.allowedTimeEnd
                             ? `${model.quota.allowedTimeStart} – ${model.quota.allowedTimeEnd}`
-                            : "All day"}
+                            : t("userDashboard.allDay")}
                         </td>
                       </tr>
                     ))}
@@ -503,13 +512,13 @@ for chunk in stream:
         <div>
           <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Key className="h-4 w-4" />
-            API Access
+            {t("userDashboard.apiAccess")}
           </h2>
           <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-6 dark:border-slate-700/60 dark:bg-slate-800/50 space-y-5">
             <MaskedApiKey apiKey={data.user.apiKey} baseUrl={data.baseUrl} />
             {modelAliases.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Authorized Models</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{t("userDashboard.authorizedModels")}</p>
                 <div className="flex flex-wrap gap-2">
                   {modelAliases.map((alias) => (
                     <span
@@ -530,13 +539,13 @@ for chunk in stream:
         <div>
           <h2 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
             <Code className="h-4 w-4" />
-            Usage Examples
+            {t("userDashboard.usageExamples")}
           </h2>
           <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-6 dark:border-slate-700/60 dark:bg-slate-800/50">
             <Tabs defaultValue="non-stream" className="w-full">
               <TabsList className="bg-slate-100/80 dark:bg-slate-700/50">
-                <TabsTrigger value="non-stream">Non-Streaming</TabsTrigger>
-                <TabsTrigger value="stream">Streaming</TabsTrigger>
+                <TabsTrigger value="non-stream">{t("userDashboard.nonStreaming")}</TabsTrigger>
+                <TabsTrigger value="stream">{t("userDashboard.streaming")}</TabsTrigger>
               </TabsList>
               <TabsContent value="non-stream" className="mt-4">
                 <CodeBlock

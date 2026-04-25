@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
 import { copyToClipboard } from "@/lib/utils/clipboard";
+import { useLanguage } from "@/lib/i18n";
 
 interface User {
   id: string;
@@ -45,6 +46,7 @@ function formatNum(n: number): string {
 
 export default function UsersPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -73,15 +75,15 @@ export default function UsersPage() {
       setUsers([]);
       setTotal(0);
       toast({
-        title: "Error",
+        title: t("common.error"),
         description:
-          err instanceof Error ? err.message : "Failed to fetch users",
+          err instanceof Error ? err.message : t("users.failedFetch"),
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [page, search, toast]);
+  }, [page, search, t, toast]);
 
   useEffect(() => {
     fetchUsers();
@@ -94,28 +96,28 @@ export default function UsersPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete user "${name}"? This action cannot be undone.`))
+    if (!confirm(t("users.deleteConfirm", { name })))
       return;
     const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
     if (res.ok) {
-      toast({ title: "User deleted" });
+      toast({ title: t("users.userDeleted") });
       fetchUsers();
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
   const handleRegenerateKey = async (id: string) => {
     if (
-      !confirm("Regenerate API key? The old key will stop working immediately.")
+      !confirm(t("users.regenKeyConfirm"))
     )
       return;
     const res = await fetch(`/api/admin/users/${id}/regenerate-key`, {
       method: "POST",
     });
     if (res.ok) {
-      toast({ title: "API key regenerated" });
+      toast({ title: t("users.apiKeyRegenerated") });
       fetchUsers();
     }
   };
@@ -123,7 +125,7 @@ export default function UsersPage() {
   const handleCopyKey = async (apiKey: string) => {
     const ok = await copyToClipboard(apiKey);
     toast({
-      title: ok ? "API key copied" : "Failed to copy API key",
+      title: ok ? t("users.apiKeyCopied") : t("users.apiKeyCopyFailed"),
       variant: ok ? "default" : "destructive",
     });
   };
@@ -139,16 +141,16 @@ export default function UsersPage() {
             <Users className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("users.title")}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {total > 0 ? `${total} user${total !== 1 ? "s" : ""} total` : "Manage user accounts and API keys"}
+              {total > 0 ? t(total !== 1 ? "users.totalCountPlural" : "users.totalCount", { count: total }) : t("users.manageDesc")}
             </p>
           </div>
         </div>
         <Link href="/admin/users/new">
           <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0">
             <Plus className="h-4 w-4 mr-2" />
-            Add User
+            {t("users.addUser")}
           </Button>
         </Link>
       </div>
@@ -159,13 +161,13 @@ export default function UsersPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
-            placeholder="Search by name or email…"
+            placeholder={t("users.searchPlaceholder")}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <Button type="submit" variant="outline" className="border-slate-200 dark:border-slate-700">
-          Search
+          {t("common.search")}
         </Button>
       </form>
 
@@ -174,14 +176,14 @@ export default function UsersPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Name</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Email</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">API Key</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Models</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Today</th>
-              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Group</th>
-              <th className="text-right py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.name")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.email")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("users.apiKey")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.status")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("users.models")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("users.today")}</th>
+              <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.group")}</th>
+              <th className="text-right py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -190,7 +192,7 @@ export default function UsersPage() {
                 <td colSpan={8} className="text-center py-16 text-slate-400">
                   <div className="flex flex-col items-center gap-2">
                     <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm">Loading…</span>
+                    <span className="text-sm">{t("common.loading")}</span>
                   </div>
                 </td>
               </tr>
@@ -199,7 +201,9 @@ export default function UsersPage() {
                 <td colSpan={8} className="text-center py-16 text-slate-400">
                   <div className="flex flex-col items-center gap-2">
                     <Bot className="h-10 w-10 opacity-30" />
-                    <span className="text-sm">No users found</span>
+                    <span className="text-sm">
+                      {loading ? t("common.loading") : t("users.noUsersFound")}
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -216,7 +220,7 @@ export default function UsersPage() {
                       {user.name}
                       {user.isAdmin && (
                         <span className="inline-flex items-center gap-1 text-xs font-medium bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 px-2 py-0.5 rounded-full">
-                          <ShieldCheck className="h-3 w-3" /> Admin
+                          <ShieldCheck className="h-3 w-3" /> {t("common.admin")}
                         </span>
                       )}
                     </div>
@@ -251,7 +255,7 @@ export default function UsersPage() {
                           user.isActive ? "bg-emerald-500" : "bg-slate-400"
                         }`}
                       />
-                      {user.isActive ? "Active" : "Inactive"}
+                      {user.isActive ? t("common.active") : t("common.inactive")}
                     </span>
                   </td>
                   <td className="py-3 px-4">
@@ -328,13 +332,7 @@ export default function UsersPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Showing{" "}
-            <span className="font-medium text-slate-700 dark:text-slate-300">
-              {(page - 1) * limit + 1}–{Math.min(page * limit, total)}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-slate-700 dark:text-slate-300">{total}</span>{" "}
-            users
+            {t("users.showing", { from: (page - 1) * limit + 1, to: Math.min(page * limit, total), total })}
           </p>
           <div className="flex items-center gap-1">
             <Button

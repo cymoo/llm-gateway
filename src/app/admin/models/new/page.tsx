@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/lib/i18n";
 
 interface ModelForm {
   alias: string;
@@ -59,6 +60,7 @@ export function ModelFormComponent({
   testLoading,
 }: ModelFormComponentProps) {
   const [form, setForm] = useState<ModelForm>(initialForm);
+  const { t } = useLanguage();
 
   const set = (key: keyof ModelForm, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -73,12 +75,12 @@ export function ModelFormComponent({
     >
       <Card>
         <CardHeader>
-          <CardTitle>Basic Configuration</CardTitle>
+          <CardTitle>{t("models.basicConfig")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="alias">
-              Model Alias <span className="text-[hsl(var(--muted-foreground))]">(user-visible name)</span>
+              {t("models.modelAlias")} <span className="text-[hsl(var(--muted-foreground))]">{t("models.aliasVisible")}</span>
             </Label>
             <Input
               id="alias"
@@ -89,12 +91,12 @@ export function ModelFormComponent({
               required
             />
             <p className="text-xs text-[hsl(var(--muted-foreground))]">
-              Only lowercase letters, digits, hyphens. Cannot start/end with hyphen.
+              {t("models.aliasHint")}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="backendUrl">Backend URL</Label>
+              <Label htmlFor="backendUrl">{t("models.backendUrlLabel")}</Label>
               <Input
                 id="backendUrl"
                 value={form.backendUrl}
@@ -104,7 +106,7 @@ export function ModelFormComponent({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="backendModel">Backend Model Name</Label>
+              <Label htmlFor="backendModel">{t("models.backendModelName")}</Label>
               <Input
                 id="backendModel"
                 value={form.backendModel}
@@ -116,7 +118,7 @@ export function ModelFormComponent({
           </div>
           <div className="space-y-2">
             <Label htmlFor="backendApiKey">
-              Backend API Key <span className="text-[hsl(var(--muted-foreground))]">(optional)</span>
+              {t("models.backendApiKey")} <span className="text-[hsl(var(--muted-foreground))]">{t("models.backendApiKeyOptional")}</span>
             </Label>
             <Input
               id="backendApiKey"
@@ -128,7 +130,7 @@ export function ModelFormComponent({
           </div>
           <div className="space-y-2">
             <Label htmlFor="remark">
-              Remark <span className="text-[hsl(var(--muted-foreground))]">(optional)</span>
+              {t("models.remark")} <span className="text-[hsl(var(--muted-foreground))]">{t("models.remarkOptional")}</span>
             </Label>
             <textarea
               id="remark"
@@ -136,7 +138,7 @@ export function ModelFormComponent({
               rows={3}
               value={form.remark}
               onChange={(e) => set("remark", e.target.value)}
-              placeholder="Optional remark"
+              placeholder={t("common.optional")}
             />
           </div>
           <div className="flex items-center gap-3">
@@ -145,54 +147,54 @@ export function ModelFormComponent({
               checked={form.isActive}
               onCheckedChange={(v) => set("isActive", v)}
             />
-            <Label htmlFor="isActive">Active</Label>
+            <Label htmlFor="isActive">{t("models.activeLabel")}</Label>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Default Quota Template</CardTitle>
+          <CardTitle>{t("models.defaultQuota")}</CardTitle>
           <p className="text-sm text-[hsl(var(--muted-foreground))]">
-            These defaults are inherited when authorizing users. Leave blank for no limit.
+            {t("models.defaultQuotaHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Max Tokens/Day</Label>
+              <Label>{t("models.maxTokensDay")}</Label>
               <Input
                 type="number"
                 min="0"
                 value={form.defaultMaxTokensPerDay}
                 onChange={(e) => set("defaultMaxTokensPerDay", e.target.value)}
-                placeholder="Unlimited"
+                placeholder={t("common.unlimited")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Max Requests/Day</Label>
+              <Label>{t("models.maxReqDay")}</Label>
               <Input
                 type="number"
                 min="0"
                 value={form.defaultMaxRequestsPerDay}
                 onChange={(e) => set("defaultMaxRequestsPerDay", e.target.value)}
-                placeholder="Unlimited"
+                placeholder={t("common.unlimited")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Max Requests/Min</Label>
+              <Label>{t("models.maxReqMin")}</Label>
               <Input
                 type="number"
                 min="0"
                 value={form.defaultMaxRequestsPerMin}
                 onChange={(e) => set("defaultMaxRequestsPerMin", e.target.value)}
-                placeholder="Unlimited"
+                placeholder={t("common.unlimited")}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Allowed Time Start (HH:MM)</Label>
+              <Label>{t("models.allowedTimeStart")}</Label>
               <Input
                 type="time"
                 value={form.defaultAllowedTimeStart}
@@ -200,7 +202,7 @@ export function ModelFormComponent({
               />
             </div>
             <div className="space-y-2">
-              <Label>Allowed Time End (HH:MM)</Label>
+              <Label>{t("models.allowedTimeEnd")}</Label>
               <Input
                 type="time"
                 value={form.defaultAllowedTimeEnd}
@@ -215,7 +217,7 @@ export function ModelFormComponent({
 
       <div className="flex gap-3">
         <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : "Save Model"}
+          {loading ? t("models.saving") : t("models.saveModel")}
         </Button>
         {modelId && onTest && (
           <Button
@@ -225,12 +227,12 @@ export function ModelFormComponent({
             disabled={testLoading}
           >
             <Wifi className="h-4 w-4 mr-2" />
-            {testLoading ? "Testing..." : "Test Connection"}
+            {testLoading ? t("models.testing") : t("models.testBtn")}
           </Button>
         )}
         <Link href="/admin/models">
           <Button variant="outline" type="button">
-            Cancel
+            {t("common.cancel")}
           </Button>
         </Link>
       </div>
@@ -241,6 +243,7 @@ export function ModelFormComponent({
 export default function NewModelPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -275,11 +278,11 @@ export default function NewModelPage() {
       });
 
       if (res.ok) {
-        toast({ title: "Model created successfully" });
+        toast({ title: t("models.createdSuccess") });
         router.push("/admin/models");
       } else {
         const data = await res.json();
-        setError(data.error || "Failed to create model");
+        setError(data.error || t("common.error"));
       }
     } finally {
       setLoading(false);
@@ -295,9 +298,9 @@ export default function NewModelPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Register Model</h1>
+          <h1 className="text-2xl font-bold">{t("models.registerModel")}</h1>
           <p className="text-[hsl(var(--muted-foreground))]">
-            Add a new vLLM backend model
+            {t("models.addVllmModel")}
           </p>
         </div>
       </div>

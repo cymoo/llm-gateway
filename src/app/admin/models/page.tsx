@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/lib/i18n";
 
 interface Model {
   id: string;
@@ -41,6 +42,7 @@ interface ModelUser {
 
 export default function ModelsPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingId, setTestingId] = useState<string | null>(null);
@@ -63,14 +65,14 @@ export default function ModelsPage() {
   }, [fetchModels]);
 
   const handleDelete = async (id: string, alias: string) => {
-    if (!confirm(`Delete model "${alias}"? All user authorizations will be removed.`)) return;
+    if (!confirm(t("models.deleteConfirm", { alias }))) return;
     const res = await fetch(`/api/admin/models/${id}`, { method: "DELETE" });
     if (res.ok) {
-      toast({ title: "Model deleted" });
+      toast({ title: t("models.modelDeleted") });
       fetchModels();
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
@@ -80,9 +82,9 @@ export default function ModelsPage() {
       const res = await fetch(`/api/admin/models/${id}/test`, { method: "POST" });
       const data = await res.json();
       if (data.status === "ok") {
-        toast({ title: `Connected (${data.latency_ms}ms)` });
+        toast({ title: t("models.connected", { ms: data.latency_ms }) });
       } else {
-        toast({ title: "Connection failed", description: data.message, variant: "destructive" });
+        toast({ title: t("models.connectionFailed"), description: data.message, variant: "destructive" });
       }
     } finally {
       setTestingId(null);
@@ -106,19 +108,19 @@ export default function ModelsPage() {
 
   const handleRemoveUser = async (userId: string, userName: string) => {
     if (!selectedModel) return;
-    if (!confirm(`Remove "${userName}" from model "${selectedModel.alias}"?`)) return;
+    if (!confirm(t("models.removeUserConfirm", { name: userName, alias: selectedModel.alias }))) return;
     const res = await fetch(`/api/admin/users/${userId}/models/${selectedModel.id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
       toast({
-        title: "Error",
-        description: "Failed to remove user from model",
+        title: t("common.error"),
+        description: t("models.removeUserFailed"),
         variant: "destructive",
       });
       return;
     }
-    toast({ title: "User removed" });
+    toast({ title: t("models.userRemoved") });
     setModelUsers((prev) => prev.filter((u) => u.id !== userId));
     setModels((prev) =>
       prev.map((m) =>
@@ -133,15 +135,15 @@ export default function ModelsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Models</h1>
+          <h1 className="text-2xl font-bold">{t("models.title")}</h1>
           <p className="text-[hsl(var(--muted-foreground))]">
-            Manage backend LLM models
+            {t("models.subtitle")}
           </p>
         </div>
         <Link href="/admin/models/new">
           <Button>
             <Plus className="h-4 w-4 mr-2" />
-            Add Model
+            {t("models.addModel")}
           </Button>
         </Link>
       </div>
@@ -150,26 +152,26 @@ export default function ModelsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Alias</TableHead>
-              <TableHead>Backend URL</TableHead>
-              <TableHead>Backend Model</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Users</TableHead>
-              <TableHead>Remark</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t("models.alias")}</TableHead>
+              <TableHead>{t("models.backendUrl")}</TableHead>
+              <TableHead>{t("models.backendModel")}</TableHead>
+              <TableHead>{t("common.status")}</TableHead>
+              <TableHead>{t("models.users")}</TableHead>
+              <TableHead>{t("models.remark")}</TableHead>
+              <TableHead className="text-right">{t("common.actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  Loading...
+                  {t("common.loading")}
                 </TableCell>
               </TableRow>
             ) : models.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
-                  No models registered
+                  {t("models.noModels")}
                 </TableCell>
               </TableRow>
             ) : (
@@ -182,7 +184,7 @@ export default function ModelsPage() {
                   <TableCell className="text-sm">{model.backendModel}</TableCell>
                   <TableCell>
                     <Badge variant={model.isActive ? "default" : "secondary"}>
-                      {model.isActive ? "Active" : "Inactive"}
+                      {model.isActive ? t("common.active") : t("common.inactive")}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -202,7 +204,7 @@ export default function ModelsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Test connection"
+                        title={t("models.testConnection")}
                         onClick={() => handleTest(model.id)}
                         disabled={testingId === model.id}
                       >
@@ -213,14 +215,14 @@ export default function ModelsPage() {
                         )}
                       </Button>
                       <Link href={`/admin/models/${model.id}`}>
-                        <Button variant="ghost" size="icon" title="Edit">
+                        <Button variant="ghost" size="icon" title={t("common.edit")}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Button
                         variant="ghost"
                         size="icon"
-                        title="Delete"
+                        title={t("common.delete")}
                         onClick={() => handleDelete(model.id, model.alias)}
                       >
                         <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
@@ -245,18 +247,18 @@ export default function ModelsPage() {
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Authorized Users</DialogTitle>
+            <DialogTitle>{t("models.authorizedUsers")}</DialogTitle>
             <DialogDescription>
-              {selectedModel ? `Model: ${selectedModel.alias}` : ""}
+              {selectedModel ? t("models.modelLabel", { alias: selectedModel.alias }) : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border max-h-[60vh] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("common.email")}</TableHead>
+                  <TableHead className="text-right">{t("common.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -266,7 +268,7 @@ export default function ModelsPage() {
                       colSpan={3}
                       className="text-center py-8 text-[hsl(var(--muted-foreground))]"
                     >
-                      Loading...
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : modelUsers.length === 0 ? (
@@ -275,7 +277,7 @@ export default function ModelsPage() {
                       colSpan={3}
                       className="text-center py-8 text-[hsl(var(--muted-foreground))]"
                     >
-                      No authorized users
+                      {t("models.noAuthorizedUsers")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -291,7 +293,7 @@ export default function ModelsPage() {
                           size="sm"
                           onClick={() => handleRemoveUser(user.id, user.name)}
                         >
-                          Remove
+                          {t("common.remove")}
                         </Button>
                       </TableCell>
                     </TableRow>

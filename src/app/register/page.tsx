@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/lib/i18n";
 
 export default function RegisterPage() {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,19 +33,17 @@ export default function RegisterPage() {
 
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(data?.error || "Registration failed");
+        setError(data?.error || t("auth.regFailed"));
         return;
       }
 
       const adminName = data?.adminName || "admin";
-      setSuccess(
-        `Registration submitted successfully. Please wait for ${adminName} approval.`
-      );
+      setSuccess(t("auth.regSuccess", { name: adminName }));
       setName("");
       setEmail("");
       setPassword("");
     } catch {
-      setError("Network error");
+      setError(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -57,26 +57,26 @@ export default function RegisterPage() {
             <Bot className="h-8 w-8 text-[hsl(var(--primary))]" />
             <span className="text-2xl font-bold">LLM Gateway</span>
           </div>
-          <p className="text-[hsl(var(--muted-foreground))]">Self Registration</p>
+          <p className="text-[hsl(var(--muted-foreground))]">{t("auth.selfRegistration")}</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Request an Account</CardTitle>
+            <CardTitle>{t("auth.requestAccount")}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
+                <Label htmlFor="name">{t("common.name")}</Label>
                 <Input
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name"
+                  placeholder={t("auth.yourName")}
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("common.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -87,13 +87,13 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <Input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Choose a password"
+                  placeholder={t("auth.choosePassword")}
                   required
                 />
               </div>
@@ -104,13 +104,13 @@ export default function RegisterPage() {
                 <p className="text-sm text-green-600">{success}</p>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Submitting..." : "Submit Registration"}
+                {loading ? t("auth.submitting") : t("auth.submitReg")}
               </Button>
             </form>
             <div className="mt-4 text-sm text-[hsl(var(--muted-foreground))]">
-              Admin?{" "}
+              {t("auth.isAdmin")}{" "}
               <Link href="/admin/login" className="underline">
-                Go to admin login
+                {t("auth.goAdminLogin")}
               </Link>
             </div>
           </CardContent>

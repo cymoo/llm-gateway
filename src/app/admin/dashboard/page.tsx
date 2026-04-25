@@ -19,6 +19,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { useLanguage } from "@/lib/i18n";
 
 interface OverviewData {
   totalUsers: number;
@@ -85,6 +86,7 @@ function formatTooltipNumber(value: unknown): string {
 export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLanguage();
 
   useEffect(() => {
     fetch("/api/admin/usage/overview")
@@ -96,7 +98,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[hsl(var(--muted-foreground))]">Loading...</div>
+        <div className="text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
       </div>
     );
   }
@@ -106,36 +108,36 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">{t("dashboard.title")}</h1>
         <p className="text-[hsl(var(--muted-foreground))]">
-          Overview of your LLM Gateway
+          {t("dashboard.subtitle")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Users"
+          title={t("dashboard.totalUsers")}
           value={data.totalUsers}
           icon={Users}
           color="bg-blue-500"
         />
         <StatCard
-          title="Active Models"
+          title={t("dashboard.activeModels")}
           value={data.activeModels}
           icon={Cpu}
           color="bg-purple-500"
         />
         <StatCard
-          title="Today's Requests"
+          title={t("dashboard.todayRequests")}
           value={formatNum(data.today.requestCount)}
-          sub={`${formatNum(data.last7Days.requestCount)} last 7 days`}
+          sub={`${formatNum(data.last7Days.requestCount)} ${t("dashboard.last7Days")}`}
           icon={Activity}
           color="bg-green-500"
         />
         <StatCard
-          title="Today's Tokens"
+          title={t("dashboard.todayTokens")}
           value={formatNum(data.today.totalTokens)}
-          sub={`${formatNum(data.last7Days.totalTokens)} last 7 days`}
+          sub={`${formatNum(data.last7Days.totalTokens)} ${t("dashboard.last7Days")}`}
           icon={Coins}
           color="bg-orange-500"
         />
@@ -143,26 +145,26 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Models"
+          title={t("dashboard.totalModels")}
           value={data.totalModels}
-          sub={`${data.activeModels} active`}
+          sub={t("dashboard.activeLabel", { n: data.activeModels })}
           icon={Cpu}
           color="bg-indigo-500"
         />
         <StatCard
-          title="7-Day Active Users"
+          title={t("dashboard.active7dUsers")}
           value={data.activeLast7Days.users}
           icon={Users}
           color="bg-cyan-500"
         />
         <StatCard
-          title="7-Day Active Models"
+          title={t("dashboard.active7dModels")}
           value={data.activeLast7Days.models}
           icon={TrendingUp}
           color="bg-emerald-500"
         />
         <StatCard
-          title="7-Day Success Rate"
+          title={t("dashboard.successRate7d")}
           value={`${data.successRate7Days}%`}
           icon={Activity}
           color="bg-rose-500"
@@ -174,7 +176,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              7-Day Request Trend
+              {t("dashboard.requestTrend7d")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -188,8 +190,8 @@ export default function DashboardPage() {
                 />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip
-                  formatter={(value) => [formatTooltipNumber(value), "Requests"]}
-                  labelFormatter={(l) => `Date: ${l}`}
+                  formatter={(value) => [formatTooltipNumber(value), t("dashboard.requests")]}
+                  labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
                 />
                 <Line
                   type="monotone"
@@ -207,7 +209,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Coins className="h-4 w-4" />
-              7-Day Token Trend
+              {t("dashboard.tokenTrend7d")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -221,8 +223,8 @@ export default function DashboardPage() {
                 />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={formatNum} />
                 <Tooltip
-                  formatter={(value) => [formatTooltipNumber(value), "Tokens"]}
-                  labelFormatter={(l) => `Date: ${l}`}
+                  formatter={(value) => [formatTooltipNumber(value), t("dashboard.tokens")]}
+                  labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
                 />
                 <Line
                   type="monotone"
@@ -241,7 +243,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              30-Day Requests
+              {t("dashboard.requests30d")}
             </p>
             <p className="text-2xl font-bold mt-1">
               {formatNum(data.last30Days.requestCount)}
@@ -251,7 +253,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              30-Day Tokens
+              {t("dashboard.tokens30d")}
             </p>
             <p className="text-2xl font-bold mt-1">
               {formatNum(data.last30Days.totalTokens)}
@@ -261,7 +263,7 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-6">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              All-Time Requests
+              {t("dashboard.allTimeRequests")}
             </p>
             <p className="text-2xl font-bold mt-1">
               {formatNum(data.allTime.requestCount)}
@@ -271,26 +273,26 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-6 flex flex-col gap-2">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              Quick Links
+              {t("dashboard.quickLinks")}
             </p>
             <div className="flex gap-2 flex-wrap">
               <Link
                 href="/admin/users/new"
                 className="text-sm text-[hsl(var(--primary))] hover:underline"
               >
-                Add User
+                {t("dashboard.addUser")}
               </Link>
               <Link
                 href="/admin/models/new"
                 className="text-sm text-[hsl(var(--primary))] hover:underline"
               >
-                Add Model
+                {t("dashboard.addModel")}
               </Link>
               <Link
                 href="/admin/usage"
                 className="text-sm text-[hsl(var(--primary))] hover:underline"
               >
-                View Usage
+                {t("dashboard.viewUsage")}
               </Link>
             </div>
           </CardContent>

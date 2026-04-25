@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { validateAdminPassword } from "@/lib/utils/validators";
+import { useLanguage } from "@/lib/i18n";
 
 interface UserData {
   id: string;
@@ -100,6 +101,7 @@ function SectionCard({
 export default function UserDetailPage() {
   const params = useParams();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const userId = params.id as string;
 
   const [user, setUser] = useState<UserData | null>(null);
@@ -152,17 +154,16 @@ export default function UserDetailPage() {
     if (!user) return;
     if (user.isAdmin && !initialIsAdmin && !password) {
       toast({
-        title: "Error",
-        description: "Password is required when enabling admin access",
+        title: t("common.error"),
+        description: t("users.pwdRequired"),
         variant: "destructive",
       });
       return;
     }
     if (user.isAdmin && !initialIsAdmin && password && !validateAdminPassword(password)) {
       toast({
-        title: "Error",
-        description:
-          "Invalid password: use 8-128 printable ASCII characters without spaces",
+        title: t("common.error"),
+        description: t("users.invalidPwd"),
         variant: "destructive",
       });
       return;
@@ -184,12 +185,12 @@ export default function UserDetailPage() {
         }),
       });
       if (res.ok) {
-        toast({ title: "User updated" });
+        toast({ title: t("users.userUpdated") });
         if (user.isAdmin && !initialIsAdmin) setPassword("");
         setInitialIsAdmin(user.isAdmin);
       } else {
         const d = await res.json();
-        toast({ title: "Error", description: d.error, variant: "destructive" });
+        toast({ title: t("common.error"), description: d.error, variant: "destructive" });
       }
     } finally {
       setSaving(false);
@@ -200,17 +201,16 @@ export default function UserDetailPage() {
     if (!user) return;
     if (!password) {
       toast({
-        title: "Error",
-        description: "Please enter a new password",
+        title: t("common.error"),
+        description: t("users.enterPwd"),
         variant: "destructive",
       });
       return;
     }
     if (!validateAdminPassword(password)) {
       toast({
-        title: "Error",
-        description:
-          "Invalid password: use 8-128 printable ASCII characters without spaces",
+        title: t("common.error"),
+        description: t("users.invalidPwd"),
         variant: "destructive",
       });
       return;
@@ -231,12 +231,12 @@ export default function UserDetailPage() {
         }),
       });
       if (res.ok) {
-        toast({ title: "Password updated" });
+        toast({ title: t("users.pwdUpdated") });
         setPassword("");
         setShowPassword(false);
       } else {
         const d = await res.json();
-        toast({ title: "Error", description: d.error, variant: "destructive" });
+        toast({ title: t("common.error"), description: d.error, variant: "destructive" });
       }
     } finally {
       setSavingPassword(false);
@@ -245,7 +245,7 @@ export default function UserDetailPage() {
 
   const handleRegenerateKey = async () => {
     if (
-      !confirm("Regenerate API key? The old key will stop working immediately.")
+      !confirm(t("users.regenKeyConfirm"))
     )
       return;
     const res = await fetch(`/api/admin/users/${userId}/regenerate-key`, {
@@ -254,7 +254,7 @@ export default function UserDetailPage() {
     if (res.ok) {
       const data = await res.json();
       setUser((u) => (u ? { ...u, apiKey: data.apiKey } : u));
-      toast({ title: "API key regenerated" });
+      toast({ title: t("users.apiKeyRegenerated") });
     }
   };
 
@@ -266,22 +266,22 @@ export default function UserDetailPage() {
       body: JSON.stringify({ modelId: selectedModelId }),
     });
     if (res.ok) {
-      toast({ title: "Model authorized" });
+      toast({ title: t("users.modelAuthorized") });
       fetchData();
       setSelectedModelId("");
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
   const handleRevokeModel = async (modelId: string, alias: string) => {
-    if (!confirm(`Revoke access to model "${alias}"?`)) return;
+    if (!confirm(t("users.revokeModelConfirm", { alias }))) return;
     const res = await fetch(`/api/admin/users/${userId}/models/${modelId}`, {
       method: "DELETE",
     });
     if (res.ok) {
-      toast({ title: "Model authorization revoked" });
+      toast({ title: t("users.modelRevoked") });
       fetchData();
     }
   };
@@ -323,7 +323,7 @@ export default function UserDetailPage() {
       }
     );
     if (res.ok) {
-      toast({ title: "Quota updated" });
+      toast({ title: t("users.quotaUpdated") });
       setEditingQuota(null);
       fetchData();
     }
@@ -342,13 +342,13 @@ export default function UserDetailPage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-2 text-slate-400">
           <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Loading…</span>
+          <span className="text-sm">{t("common.loading")}</span>
         </div>
       </div>
     );
   }
 
-  if (!user) return <div>User not found</div>;
+  if (!user) return <div>{t("users.userNotFound")}</div>;
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -377,11 +377,11 @@ export default function UserDetailPage() {
       </div>
 
       {/* User Information */}
-      <SectionCard title="User Information" icon={UserCog}>
+      <SectionCard title={t("users.userInformation")} icon={UserCog}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-slate-700 dark:text-slate-300">Name</Label>
+              <Label className="text-slate-700 dark:text-slate-300">{t("common.name")}</Label>
               <Input
                 value={user.name}
                 onChange={(e) => setUser({ ...user, name: e.target.value })}
@@ -390,7 +390,7 @@ export default function UserDetailPage() {
             </div>
             <div className="space-y-2">
               <Label className="text-slate-700 dark:text-slate-300">
-                Email
+                {t("common.email")}
               </Label>
               <Input
                 type="email"
@@ -405,7 +405,7 @@ export default function UserDetailPage() {
               htmlFor="remark"
               className="text-slate-700 dark:text-slate-300"
             >
-              Remark
+              {t("common.remark")}
             </Label>
             <textarea
               id="remark"
@@ -426,27 +426,20 @@ export default function UserDetailPage() {
               onValueChange={(v) => setUser({ ...user, groupId: v || null })}
             >
               <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500">
-                <SelectValue placeholder="Select group…" />
+                <SelectValue placeholder={t("users.selectGroup")} />
               </SelectTrigger>
               <SelectContent>
                 {groups.map((g) => (
                   <SelectItem key={g.id} value={g.id}>
                     {g.name}
-                    {g.isDefault ? " (Default)" : ""}
+                  {g.isDefault ? t("users.defaultSuffix") : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {!isInDefaultGroup && (
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                This user&apos;s model access is managed by group{" "}
-                <Link
-                  href={`/admin/groups/${currentGroup?.id}`}
-                  className="underline hover:text-amber-700"
-                >
-                  {currentGroup?.name}
-                </Link>
-                . Individual model config is ignored.
+                {t("users.groupManagedNote", { group: currentGroup?.name ?? "" })}
               </p>
             )}
           </div>
@@ -461,7 +454,7 @@ export default function UserDetailPage() {
                 htmlFor="active"
                 className="text-slate-700 dark:text-slate-300"
               >
-                Account Active
+                {t("users.accountActive")}
               </Label>
             </div>
             <div className="flex items-center gap-3">
@@ -475,7 +468,7 @@ export default function UserDetailPage() {
                 className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5"
               >
                 <ShieldCheck className="h-3.5 w-3.5 text-indigo-500" />
-                Admin Access
+                {t("users.adminAccess")}
               </Label>
             </div>
           </div>
@@ -486,24 +479,24 @@ export default function UserDetailPage() {
                 htmlFor="newAdminPassword"
                 className="text-indigo-700 dark:text-indigo-300 text-sm font-medium"
               >
-                Set Admin Password (required)
+                {t("users.setAdminPwd")}
               </Label>
               <Input
                 id="newAdminPassword"
                 type="password"
-                placeholder="Set a password for admin login"
+                placeholder={t("users.setAdminPwdPlaceholder")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-white dark:bg-slate-800 border-indigo-200 dark:border-indigo-700 focus-visible:ring-indigo-500"
               />
               <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70">
-                8–128 printable ASCII characters, no spaces
+                {t("users.pwdHint")}
               </p>
             </div>
           )}
           <div className="space-y-2">
             <Label className="text-slate-700 dark:text-slate-300">
-              API Key
+              {t("users.apiKey")}
             </Label>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-sm bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 px-3 py-2 rounded-md font-mono truncate">
@@ -530,7 +523,7 @@ export default function UserDetailPage() {
                 className="border-slate-200 dark:border-slate-700"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerate
+                {t("users.regenerate")}
               </Button>
             </div>
           </div>
@@ -539,21 +532,20 @@ export default function UserDetailPage() {
             disabled={saving}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0"
           >
-            {saving ? "Saving…" : "Save Changes"}
+            {saving ? t("users.saving") : t("users.saveChanges")}
           </Button>
         </div>
       </SectionCard>
 
       {/* Password Settings */}
-      <SectionCard title="Password Settings" icon={KeyRound}>
+      <SectionCard title={t("users.passwordSettings")} icon={KeyRound}>
         <div className="space-y-4">
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Update the login password for this user. Leave blank to keep the
-            current password.
+            {t("users.pwdDesc")}
           </p>
           {user.isAdmin && (
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              This password can also be used for admin login.
+              {t("users.pwdAdminNote")}
             </p>
           )}
           <div className="space-y-2">
@@ -561,13 +553,13 @@ export default function UserDetailPage() {
               htmlFor="adminPassword"
               className="text-slate-700 dark:text-slate-300"
             >
-              New Password
+              {t("users.newPassword")}
             </Label>
             <div className="flex items-center gap-2">
               <Input
                 id="adminPassword"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter new password"
+                placeholder={t("users.enterNewPwd")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-blue-500"
@@ -587,7 +579,7 @@ export default function UserDetailPage() {
               </Button>
             </div>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              8–128 printable ASCII characters, no spaces
+              {t("users.pwdHint")}
             </p>
           </div>
           <Button
@@ -595,14 +587,14 @@ export default function UserDetailPage() {
             disabled={savingPassword || !password}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0"
           >
-            {savingPassword ? "Saving…" : "Update Password"}
+            {savingPassword ? t("users.saving") : t("users.updatePwd")}
           </Button>
         </div>
       </SectionCard>
 
       {/* Authorized Models */}
       <SectionCard
-        title={isInDefaultGroup ? "Authorized Models" : "Models (via Group)"}
+        title={isInDefaultGroup ? t("users.authorizedModels") : t("users.modelsViaGroup")}
         action={
           isInDefaultGroup ? (
             <div className="flex items-center gap-2">
@@ -611,7 +603,7 @@ export default function UserDetailPage() {
                 onValueChange={setSelectedModelId}
               >
                 <SelectTrigger className="w-48 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                  <SelectValue placeholder="Select model…" />
+                  <SelectValue placeholder={t("users.selectModel")} />
                 </SelectTrigger>
                 <SelectContent>
                   {unauthorizedModels.map((m) => (
@@ -628,14 +620,14 @@ export default function UserDetailPage() {
                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
-                Authorize
+                {t("common.authorize")}
               </Button>
             </div>
           ) : (
             <Link href={`/admin/groups/${currentGroup?.id}`}>
               <Button variant="outline" size="sm" className="h-7 text-xs border-slate-200 dark:border-slate-700">
                 <Users2 className="h-3.5 w-3.5 mr-1" />
-                Edit in Group
+                {t("users.editInGroup")}
               </Button>
             </Link>
           )
@@ -643,12 +635,12 @@ export default function UserDetailPage() {
       >
         {!isInDefaultGroup && (
           <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-            Model access is inherited from group <strong>{currentGroup?.name}</strong>. Shown below for reference only.
+            {t("users.modelInheritedNote", { group: currentGroup?.name ?? "" })}
           </p>
         )}
         {authModels.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">
-            No models authorized yet
+            {t("users.noModelsAuthorized")}
           </p>
         ) : (
           <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
@@ -659,19 +651,19 @@ export default function UserDetailPage() {
                     Model
                   </th>
                   <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">
-                    Tokens/Day
+                    {t("users.tokensDay")}
                   </th>
                   <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">
-                    Req/Day
+                    {t("users.reqDay")}
                   </th>
                   <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">
-                    Req/Min
+                    {t("users.reqMin")}
                   </th>
                   <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">
-                    Time Window
+                    {t("users.timeWindow")}
                   </th>
                   <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">
-                    Actions
+                    {t("common.actions")}
                   </th>
                 </tr>
               </thead>
@@ -687,7 +679,7 @@ export default function UserDetailPage() {
                           <td className="py-2.5 px-4">
                             <Input
                               className="h-7 w-24 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                              placeholder="Unlimited"
+                              placeholder={t("common.unlimited")}
                               value={quotaForm.maxTokensPerDay}
                               onChange={(e) =>
                                 setQuotaForm({
@@ -700,7 +692,7 @@ export default function UserDetailPage() {
                           <td className="py-2.5 px-4">
                             <Input
                               className="h-7 w-20 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                              placeholder="Unlimited"
+                              placeholder={t("common.unlimited")}
                               value={quotaForm.maxRequestsPerDay}
                               onChange={(e) =>
                                 setQuotaForm({
@@ -713,7 +705,7 @@ export default function UserDetailPage() {
                           <td className="py-2.5 px-4">
                             <Input
                               className="h-7 w-16 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
-                              placeholder="Unlimited"
+                              placeholder={t("common.unlimited")}
                               value={quotaForm.maxRequestsPerMin}
                               onChange={(e) =>
                                 setQuotaForm({
@@ -757,7 +749,7 @@ export default function UserDetailPage() {
                                 onClick={() => handleSaveQuota(am.model.id)}
                                 className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0 h-7"
                               >
-                                Save
+                                {t("common.save")}
                               </Button>
                               <Button
                                 size="sm"
@@ -765,7 +757,7 @@ export default function UserDetailPage() {
                                 onClick={() => setEditingQuota(null)}
                                 className="border-slate-200 dark:border-slate-700 h-7"
                               >
-                                Cancel
+                                {t("common.cancel")}
                               </Button>
                             </div>
                           </td>

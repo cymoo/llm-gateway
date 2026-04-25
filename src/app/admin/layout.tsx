@@ -11,21 +11,24 @@ import {
   BarChart3,
   LogOut,
   Bot,
+  Languages,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ToastContextProvider } from "@/components/ui/use-toast";
-
-const navItems = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/groups", label: "Groups", icon: Users2 },
-  { href: "/admin/models", label: "Models", icon: Cpu },
-  { href: "/admin/usage", label: "Usage", icon: BarChart3 },
-];
+import { useLanguage } from "@/lib/i18n";
 
 function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { t, lang, setLang } = useLanguage();
+
+  const navItems = [
+    { href: "/admin/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+    { href: "/admin/users", label: t("nav.users"), icon: Users },
+    { href: "/admin/groups", label: t("nav.groups"), icon: Users2 },
+    { href: "/admin/models", label: t("nav.models"), icon: Cpu },
+    { href: "/admin/usage", label: t("nav.usage"), icon: BarChart3 },
+  ];
 
   const handleLogout = async () => {
     await fetch("/api/admin/auth/logout", { method: "POST" });
@@ -60,13 +63,20 @@ function Sidebar() {
           );
         })}
       </nav>
-      <div className="px-3 py-4 border-t border-[hsl(var(--sidebar-border))]">
+      <div className="px-3 py-4 border-t border-[hsl(var(--sidebar-border))] space-y-1">
+        <button
+          onClick={() => setLang(lang === "en" ? "zh" : "en")}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[hsl(var(--sidebar-foreground))]/80 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))] transition-colors"
+        >
+          <Languages className="h-4 w-4" />
+          {t("nav.switchLang")}
+        </button>
         <button
           onClick={handleLogout}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[hsl(var(--sidebar-foreground))]/80 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))] transition-colors"
         >
           <LogOut className="h-4 w-4" />
-          Logout
+          {t("nav.logout")}
         </button>
       </div>
     </div>

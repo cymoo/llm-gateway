@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLanguage } from "@/lib/i18n";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -32,10 +34,10 @@ export default function LoginPage() {
         router.push("/dashboard");
       } else {
         const data = await res.json();
-        setError(data.error || "Login failed");
+        setError(data.error || t("auth.loginFailed"));
       }
     } catch {
-      setError("Network error");
+      setError(t("auth.networkError"));
     } finally {
       setLoading(false);
     }
@@ -49,16 +51,16 @@ export default function LoginPage() {
             <Bot className="h-8 w-8 text-[hsl(var(--primary))]" />
             <span className="text-2xl font-bold">LLM Gateway</span>
           </div>
-          <p className="text-[hsl(var(--muted-foreground))]">User Console</p>
+          <p className="text-[hsl(var(--muted-foreground))]">{t("auth.userConsole")}</p>
         </div>
         <Card>
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
+            <CardTitle>{t("auth.signIn")}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t("common.email")}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -69,7 +71,7 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{t("auth.password")}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -83,19 +85,19 @@ export default function LoginPage() {
                 <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
+                {loading ? t("auth.signingIn") : t("auth.signIn")}
               </Button>
             </form>
             <div className="mt-4 text-sm text-[hsl(var(--muted-foreground))]">
-              Need an account?{" "}
+              {t("auth.needAccount")}{" "}
               <Link href="/register" className="underline">
-                Submit self-registration
+                {t("auth.submitSelfReg")}
               </Link>
             </div>
             <div className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              Admin?{" "}
+              {t("auth.isAdmin")}{" "}
               <Link href="/admin/login" className="underline">
-                Go to admin login
+                {t("auth.goAdminLogin")}
               </Link>
             </div>
           </CardContent>

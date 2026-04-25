@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ interface GroupMember {
 
 export default function GroupsPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -87,13 +89,13 @@ export default function GroupsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: "Group created" });
+        toast({ title: t("groups.created") });
         setNewName("");
         setNewRemark("");
         setShowCreate(false);
         fetchGroups();
       } else {
-        toast({ title: "Error", description: data.error, variant: "destructive" });
+        toast({ title: t("common.error"), description: data.error, variant: "destructive" });
       }
     } finally {
       setCreating(false);
@@ -102,20 +104,20 @@ export default function GroupsPage() {
 
   const handleDelete = async (group: Group) => {
     if (group.isDefault) {
-      toast({ title: "Cannot delete the Default group", variant: "destructive" });
+      toast({ title: t("groups.cannotDeleteDefault"), variant: "destructive" });
       return;
     }
     const msg = group.memberCount > 0
-      ? `Delete group "${group.name}"? Its ${group.memberCount} member(s) will be moved to the Default group.`
-      : `Delete group "${group.name}"?`;
+      ? t("groups.deleteConfirmWithMembers", { name: group.name, count: group.memberCount })
+      : t("groups.deleteConfirm", { name: group.name });
     if (!confirm(msg)) return;
     const res = await fetch(`/api/admin/groups/${group.id}`, { method: "DELETE" });
     if (res.ok || res.status === 204) {
-      toast({ title: "Group deleted" });
+      toast({ title: t("groups.deleted") });
       fetchGroups();
     } else {
       const data = await res.json().catch(() => ({}));
-      toast({ title: "Error", description: data.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: data.error, variant: "destructive" });
     }
   };
 
@@ -127,9 +129,9 @@ export default function GroupsPage() {
             <Users2 className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Groups</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("groups.title")}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Manage user groups and per-model quotas
+              {t("groups.subtitle")}
             </p>
           </div>
         </div>
@@ -138,16 +140,16 @@ export default function GroupsPage() {
           className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
         >
           <Plus className="h-4 w-4 mr-1.5" />
-          New Group
+          {t("groups.newGroup")}
         </Button>
       </div>
 
       {showCreate && (
         <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/60 shadow-sm p-6 space-y-4">
-          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Create Group</h2>
+          <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">{t("groups.createGroup")}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t("common.name")}</Label>
               <Input
                 placeholder="e.g. Engineering"
                 value={newName}
@@ -156,9 +158,9 @@ export default function GroupsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Remark (optional)</Label>
+              <Label>{t("groups.remarkOptional")}</Label>
               <Input
-                placeholder="Description"
+                placeholder={t("groups.descriptionPlaceholder")}
                 value={newRemark}
                 onChange={(e) => setNewRemark(e.target.value)}
               />
@@ -170,10 +172,10 @@ export default function GroupsPage() {
               disabled={creating || !newName.trim()}
               className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
             >
-              {creating ? "Creating…" : "Create"}
+              {creating ? t("groups.creating") : t("common.create")}
             </Button>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
@@ -185,15 +187,15 @@ export default function GroupsPage() {
             <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : groups.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 dark:text-slate-500">No groups yet</div>
+          <div className="text-center py-12 text-slate-400 dark:text-slate-500">{t("groups.noGroups")}</div>
         ) : (
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
-                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">Name</th>
-                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">Remark</th>
-                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">Members</th>
-                <th className="text-right py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">{t("common.name")}</th>
+                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">{t("common.remark")}</th>
+                <th className="text-left py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">{t("groups.members")}</th>
+                <th className="text-right py-3 px-5 font-semibold text-slate-600 dark:text-slate-300">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -207,7 +209,7 @@ export default function GroupsPage() {
                       {g.name}
                       {g.isDefault && (
                         <span className="text-xs bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 rounded-full px-2 py-0.5 font-medium">
-                          Default
+                          {t("common.default")}
                         </span>
                       )}
                     </div>
@@ -267,31 +269,31 @@ export default function GroupsPage() {
       >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Group Members</DialogTitle>
+            <DialogTitle>{t("groups.groupMembers")}</DialogTitle>
             <DialogDescription>
-              {selectedGroup ? `Group: ${selectedGroup.name}` : ""}
+              {selectedGroup ? t("groups.groupLabel", { name: selectedGroup.name }) : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border max-h-[60vh] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{t("common.name")}</TableHead>
+                  <TableHead>{t("common.email")}</TableHead>
+                  <TableHead>{t("common.status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loadingMembers ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-8 text-slate-400">
-                      Loading...
+                      {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : groupMembers.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-8 text-slate-400">
-                      No members
+                      {t("groups.noMembers")}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -301,7 +303,7 @@ export default function GroupsPage() {
                       <TableCell className="text-slate-500">{user.email}</TableCell>
                       <TableCell>
                         <span className={user.isActive ? "text-green-600" : "text-slate-400"}>
-                          {user.isActive ? "Active" : "Inactive"}
+                          {user.isActive ? t("common.active") : t("common.inactive")}
                         </span>
                       </TableCell>
                     </TableRow>

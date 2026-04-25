@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import { useLanguage } from "@/lib/i18n";
 
 export default function NewUserPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [remark, setRemark] = useState("");
@@ -31,7 +33,7 @@ export default function NewUserPage() {
       });
 
       if (res.ok) {
-        toast({ title: "User created successfully" });
+        toast({ title: t("users.createSuccess") });
         router.push("/admin/users");
       } else {
         const data = await res.json();
@@ -60,9 +62,9 @@ export default function NewUserPage() {
             <UserPlus className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Create User</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("users.createUser")}</h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              A new API key will be auto-generated
+              {t("users.autoApiKey")}
             </p>
           </div>
         </div>
@@ -72,7 +74,7 @@ export default function NewUserPage() {
       <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-800/60 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200/60 dark:border-slate-700/60">
           <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">
-            User Details
+            {t("users.userDetails")}
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
@@ -81,7 +83,7 @@ export default function NewUserPage() {
               htmlFor="name"
               className="text-slate-700 dark:text-slate-300"
             >
-              Name
+              {t("common.name")}
             </Label>
             <Input
               id="name"
@@ -97,7 +99,7 @@ export default function NewUserPage() {
               htmlFor="email"
               className="text-slate-700 dark:text-slate-300"
             >
-              Email
+              {t("common.email")}
             </Label>
             <Input
               id="email"
@@ -114,7 +116,7 @@ export default function NewUserPage() {
               htmlFor="remark"
               className="text-slate-700 dark:text-slate-300"
             >
-              Remark
+              {t("common.remark")}
             </Label>
             <textarea
               id="remark"
@@ -122,7 +124,7 @@ export default function NewUserPage() {
               rows={3}
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
-              placeholder="Optional remark"
+              placeholder={t("common.optional")}
             />
           </div>
           {error && (
@@ -134,7 +136,7 @@ export default function NewUserPage() {
               disabled={loading}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm shadow-blue-200 dark:shadow-blue-900/30 border-0"
             >
-              {loading ? "Creating..." : "Create User"}
+              {loading ? t("common.creating") : t("users.createUser")}
             </Button>
             <Link href="/admin/users">
               <Button
@@ -142,7 +144,7 @@ export default function NewUserPage() {
                 type="button"
                 className="border-slate-200 dark:border-slate-700"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             </Link>
           </div>

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { useLanguage } from "@/lib/i18n";
 
 interface Group {
   id: string;
@@ -85,6 +86,7 @@ function SectionCard({
 export default function GroupDetailPage() {
   const params = useParams();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const groupId = params.id as string;
 
   const [group, setGroup] = useState<Group | null>(null);
@@ -144,10 +146,10 @@ export default function GroupDetailPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        toast({ title: "Group updated" });
+        toast({ title: t("groups.updated") });
         setGroup({ ...group, name: data.name, remark: data.remark });
       } else {
-        toast({ title: "Error", description: data.error, variant: "destructive" });
+        toast({ title: t("common.error"), description: data.error, variant: "destructive" });
       }
     } finally {
       setSaving(false);
@@ -162,22 +164,22 @@ export default function GroupDetailPage() {
       body: JSON.stringify({ modelId: selectedModelId }),
     });
     if (res.ok) {
-      toast({ title: "Model added to group" });
+      toast({ title: t("groups.modelAddedToGroup") });
       setSelectedModelId("");
       fetchData();
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
   const handleRemoveModel = async (modelId: string, alias: string) => {
-    if (!confirm(`Remove model "${alias}" from this group?`)) return;
+    if (!confirm(t("groups.removeModelConfirm", { alias }))) return;
     const res = await fetch(`/api/admin/groups/${groupId}/models/${modelId}`, {
       method: "DELETE",
     });
     if (res.ok) {
-      toast({ title: "Model removed from group" });
+      toast({ title: t("groups.modelRemovedFromGroup") });
       fetchData();
     }
   };
@@ -190,26 +192,26 @@ export default function GroupDetailPage() {
       body: JSON.stringify({ userId: selectedUserId }),
     });
     if (res.ok) {
-      toast({ title: "User added to group" });
+      toast({ title: t("groups.addedToGroup") });
       setSelectedUserId("");
       fetchData();
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
   const handleRemoveMember = async (userId: string, userName: string) => {
-    if (!confirm(`Remove "${userName}" from this group? They will be moved to the Default group.`)) return;
+    if (!confirm(t("groups.removeMemberConfirm", { name: userName }))) return;
     const res = await fetch(`/api/admin/groups/${groupId}/members/${userId}`, {
       method: "DELETE",
     });
     if (res.ok || res.status === 204) {
-      toast({ title: "User removed from group" });
+      toast({ title: t("groups.removedFromGroup") });
       fetchData();
     } else {
       const d = await res.json().catch(() => ({}));
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
@@ -238,12 +240,12 @@ export default function GroupDetailPage() {
       body: JSON.stringify(body),
     });
     if (res.ok) {
-      toast({ title: "Quota updated" });
+      toast({ title: t("groups.quotaUpdated") });
       setEditingQuota(null);
       fetchData();
     } else {
       const d = await res.json();
-      toast({ title: "Error", description: d.error, variant: "destructive" });
+      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
@@ -258,7 +260,9 @@ export default function GroupDetailPage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-2 text-slate-400">
           <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-sm">Loading…</span>
+          <span className="text-sm">
+            {t("common.loading")}
+          </span>
         </div>
       </div>
     );
@@ -299,30 +303,30 @@ export default function GroupDetailPage() {
       </div>
 
       {/* Group Info */}
-      <SectionCard title="Group Information" icon={Users2}>
+      <SectionCard title={t("groups.groupInformation")} icon={Users2}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label>{t("common.name")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 disabled={group.isDefault}
-                placeholder="Group name"
+                placeholder={t("groups.namePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label>Remark (optional)</Label>
+              <Label>{t("groups.remarkOptional")}</Label>
               <Input
                 value={remark}
                 onChange={(e) => setRemark(e.target.value)}
-                placeholder="Description"
+                placeholder={t("groups.descriptionPlaceholder")}
               />
             </div>
           </div>
           {group.isDefault && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
-              The Default group name cannot be changed.
+              {t("groups.defaultNameCannotChange")}
             </p>
           )}
           <Button
@@ -330,14 +334,14 @@ export default function GroupDetailPage() {
             disabled={saving || group.isDefault}
             className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
           >
-            {saving ? "Saving…" : "Save Changes"}
+            {saving ? t("groups.saving") : t("groups.saveChanges")}
           </Button>
         </div>
       </SectionCard>
 
       {/* Members */}
       <SectionCard
-        title={`Members (${members.length})`}
+        title={`${t("groups.members")} (${members.length})`}
         icon={UserPlus}
         action={
           <div className="flex items-center gap-2">
@@ -345,7 +349,7 @@ export default function GroupDetailPage() {
               value={selectedUserId}
               onChange={setSelectedUserId}
               options={nonMembers.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` }))}
-              placeholder="Select user…"
+              placeholder={t("groups.selectUser")}
               className="min-w-[200px]"
             />
             <Button
@@ -355,22 +359,22 @@ export default function GroupDetailPage() {
               className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
             >
               <Plus className="h-4 w-4 mr-1.5" />
-              Add
+              {t("groups.addMember")}
             </Button>
           </div>
         }
       >
         {members.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">No members in this group</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">{t("groups.noMembers")}</p>
         ) : (
           <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Name</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Email</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
-                  <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.name")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.email")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.status")}</th>
+                  <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,7 +387,7 @@ export default function GroupDetailPage() {
                     <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">{m.email}</td>
                     <td className="py-2.5 px-4">
                       <span className={m.isActive ? "text-green-600 dark:text-green-400" : "text-slate-400"}>
-                        {m.isActive ? "Active" : "Inactive"}
+                        {m.isActive ? t("common.active") : t("common.inactive")}
                       </span>
                     </td>
                     <td className="py-2.5 px-4">
@@ -392,7 +396,7 @@ export default function GroupDetailPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Remove from group"
+                            title={t("common.remove")}
                             onClick={() => handleRemoveMember(m.id, m.name)}
                             className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                           >
@@ -411,7 +415,7 @@ export default function GroupDetailPage() {
 
       {/* Model Access */}
       <SectionCard
-        title="Model Access & Quotas"
+        title={t("groups.authorizedModels")}
         action={
           group.isDefault ? undefined :
           <div className="flex items-center gap-2">
@@ -420,7 +424,7 @@ export default function GroupDetailPage() {
               onChange={(e) => setSelectedModelId(e.target.value)}
               className="text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 min-w-[160px]"
             >
-              <option value="">Select model…</option>
+              <option value="">{t("groups.selectModel")}</option>
               {unauthorizedModels.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.alias}
@@ -434,7 +438,7 @@ export default function GroupDetailPage() {
               className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
             >
               <Plus className="h-4 w-4 mr-1.5" />
-              Add
+              {t("common.add")}
             </Button>
           </div>
         }
@@ -448,18 +452,18 @@ export default function GroupDetailPage() {
           </div>
         )}
         {groupModels.length === 0 ? (
-          <p className="text-sm text-slate-400 dark:text-slate-500">No models added yet</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500">{t("groups.noMembers")}</p>
         ) : (
           <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Model</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Tokens/Day</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Req/Day</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Req/Min</th>
-                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Time Window</th>
-                  <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("models.alias")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("groups.tokensDay")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("groups.reqDay")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("groups.reqMin")}</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("groups.timeWindow")}</th>
+                  <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -519,7 +523,7 @@ export default function GroupDetailPage() {
                                 onClick={() => handleSaveQuota(gm.model.id)}
                                 className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0 h-7"
                               >
-                                Save
+                                {t("common.save")}
                               </Button>
                               <Button
                                 size="sm"
@@ -527,7 +531,7 @@ export default function GroupDetailPage() {
                                 onClick={() => setEditingQuota(null)}
                                 className="border-slate-200 dark:border-slate-700 h-7"
                               >
-                                Cancel
+                                {t("common.cancel")}
                               </Button>
                             </div>
                           </td>
@@ -556,7 +560,7 @@ export default function GroupDetailPage() {
                                 onClick={() => handleStartEditQuota(gm.model.id, gm.quota)}
                                 className="h-7 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
                               >
-                                Edit Quota
+                                {t("common.edit")}
                               </Button>
                               <Button
                                 variant="ghost"

@@ -7,11 +7,13 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { ModelFormComponent } from "../new/page";
+import { useLanguage } from "@/lib/i18n";
 
 export default function ModelDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const modelId = params.id as string;
 
   const [initialForm, setInitialForm] = useState<{
@@ -104,10 +106,10 @@ export default function ModelDetailPage() {
       });
       const data = await res.json();
       if (data.status === "ok") {
-        toast({ title: `Connected (${data.latency_ms}ms)` });
+        toast({ title: t("models.connected", { ms: data.latency_ms }) });
       } else {
         toast({
-          title: "Connection failed",
+          title: t("models.connectionFailed"),
           description: data.message,
           variant: "destructive",
         });
@@ -120,7 +122,7 @@ export default function ModelDetailPage() {
   if (fetchLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-[hsl(var(--muted-foreground))]">Loading...</div>
+        <div className="text-[hsl(var(--muted-foreground))]">{t("common.loading")}</div>
       </div>
     );
   }
@@ -136,7 +138,7 @@ export default function ModelDetailPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">Edit Model</h1>
+          <h1 className="text-2xl font-bold">{t("models.editModel")}</h1>
           <p className="text-[hsl(var(--muted-foreground))]">{initialForm.alias}</p>
         </div>
       </div>
