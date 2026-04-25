@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { BarChart3, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,8 @@ function getDefaultRange() {
 }
 
 export default function UsagePage() {
-  const [tab, setTab] = useState("by-user");
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState(() => searchParams.get("tab") || "by-user");
   const [dateRange, setDateRange] = useState(getDefaultRange());
   const [userStats, setUserStats] = useState<UserStat[]>([]);
   const [modelStats, setModelStats] = useState<ModelStat[]>([]);
@@ -105,7 +107,7 @@ export default function UsagePage() {
   const [logsPage, setLogsPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
-  const [userFilter, setUserFilter] = useState("");
+  const [userFilter, setUserFilter] = useState(() => searchParams.get("user") || "");
   const [ipFilter, setIpFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [userOptions, setUserOptions] = useState<FilterOption[]>([]);
