@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
- * 中文 Changelog 生成器
+ * 中文 Changelog 生成器（含自动翻译）
  *
- * 解析 git log，按 Conventional Commits 类型分组，输出中文 Markdown。
+ * 解析 git log，将提交描述翻译为中文，按类型分组，输出 Markdown。
+ * 翻译通过 Google Translate 免费接口完成，无需 API key。
  *
  * 用法：
- *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --from <prevTag>
+ *   node scripts/generate-changelog-zh.mjs --version v0.2.0 --from v0.1.0
  *   node scripts/generate-changelog-zh.mjs --version v0.1.0          # 全部历史
- *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --stdout # 输出到 stdout
+ *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --stdout # 预览到 stdout
+ *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --no-translate # 跳过翻译
  */
 
 import { execFileSync } from 'child_process';
@@ -31,22 +33,22 @@ const TYPE_MAP = {
   revert:   '⏪ 回滚',
 };
 
+// ── 参数解析 ────────────────────────────────────────────────────────────────
+
 function parseArgs(argv) {
-  const args = {};
+  const args = { translate: true };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--from') args.from = argv[++i];
-    else if (argv[i] === '--to') args.to = argv[++i];
+    if (argv[i] === '--from')         args.from = argv[++i];
+    else if (argv[i] === '--to')      args.to = argv[++i];
     else if (argv[i] === '--version') args.version = argv[++i];
-    else if (argv[i] === '--dry-run') args.dryRun = true;
-    else if (argv[i] === '--stdout') args.stdout = true;
+    else if (argv[i] === '--stdout')  args.stdout = true;
+    else if (argv[i] === '--no-translate') args.translate = false;
   }
   return args;
 }
 
-/**
- * 用 \x1e (RS) 分隔记录，\x1f (US) 分隔字段，%B 获取完整 body（含多行）。
- * 使用 execFileSync 避免 shell 注入。
- */
+// ── Git 解析 ────────────────────────────────────────────────────────────────
+
 function getCommits(from, to = 'HEAD') {
   const range = from ? `${from}..${to}` : to;
   try {
@@ -64,7 +66,7 @@ function getCommits(from, to = 'HEAD') {
 function parseCommitLog(raw) {
   return raw
     .split('\x1e')
-    .slice(1) // 首个元素为空字符串
+    .slice(1)
     .map((record) => {
       const idx1 = record.indexOf('\x1f');
       const idx2 = record.indexOf('\x1f', idx1 + 1);
@@ -83,19 +85,80 @@ function parseCommit(commit) {
   );
   if (!match) return null;
   const { type, scope, breaking, desc } = match.groups;
-  const isBreaking =
-    !!breaking || /^BREAKING CHANGE/m.test(commit.body);
+  // 过滤自动生成的 release 提交（chore(release): vX.X.X）
+  if (type === 'chore' && scope === 'release') return null;
+  const isBreaking = !!breaking || /^BREAKING CHANGE/m.test(commit.body);
   return { ...commit, type, scope, desc, isBreaking };
 }
+
+// ── 翻译 ────────────────────────────────────────────────────────────────────
+
+/** 调用 Google Translate 非官方接口翻译单条文本（sl=en → tl=zh-CN）*/
+async function translateOne(text, retries = 3) {
+  const url =
+    'https://translate.googleapis.com/translate_a/single' +
+    `?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      // 响应格式：[ [ [translated, original], ... ], ... ]
+      return data[0].map((seg) => seg[0]).join('').trim();
+    } catch {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+      }
+    }
+  }
+  return text; // 翻译失败时保留原文
+}
+
+/** 并发翻译多条文本（concurrency 控制并发数，避免触发限流）*/
+async function translateBatch(texts, concurrency = 5) {
+  const results = new Array(texts.length).fill('');
+  let cursor = 0;
+  let done = 0;
+
+  // 进度条
+  const showProgress = () => {
+    process.stderr.write(`\r[changelog-zh] 翻译进度：${done}/${texts.length} `);
+  };
+  showProgress();
+
+  async function worker() {
+    while (cursor < texts.length) {
+      const i = cursor++;
+      results[i] = await translateOne(texts[i]);
+      done++;
+      showProgress();
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, texts.length) }, worker));
+  process.stderr.write('\n');
+  return results;
+}
+
+// ── 格式化 ──────────────────────────────────────────────────────────────────
 
 function formatEntry(parsed) {
   const scope = parsed.scope ? `**${parsed.scope}**: ` : '';
   const hash = parsed.hash.slice(0, 7);
-  return `- ${scope}${parsed.desc} (\`${hash}\`)`;
+  const desc = parsed.descZh ?? parsed.desc;
+  return `- ${scope}${desc} (\`${hash}\`)`;
 }
 
-function buildSection(version, date, commits) {
+async function buildSection(version, date, commits, doTranslate) {
   const parsed = commits.map(parseCommit).filter(Boolean);
+
+  if (doTranslate && parsed.length > 0) {
+    const descs = parsed.map((c) => c.desc);
+    const translated = await translateBatch(descs);
+    parsed.forEach((c, i) => {
+      c.descZh = translated[i];
+    });
+  }
 
   const breaking = parsed.filter((c) => c.isBreaking);
   const byType = {};
@@ -157,11 +220,13 @@ if (commits.length === 0) {
   process.exit(0);
 }
 
-const section = buildSection(version, date, commits);
+const section = await buildSection(version, date, commits, args.translate);
 
-if (args.dryRun || args.stdout) {
+if (args.stdout) {
   console.log(section);
 } else {
   prependToFile(OUTPUT, section);
-  console.log(`[changelog-zh] 已更新 CHANGELOG-zh.md（${commits.length} 条提交）`);
+  console.log(
+    `[changelog-zh] 已更新 CHANGELOG-zh.md（${commits.length} 条提交${args.translate ? '，含机器翻译' : ''}）`
+  );
 }
