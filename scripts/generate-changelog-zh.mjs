@@ -1,15 +1,20 @@
 #!/usr/bin/env node
 /**
- * 中文 Changelog 生成器（含自动翻译）
+ * 中文 Changelog 生成器（基于 LLM）
  *
- * 解析 git log，将提交描述翻译为中文，按类型分组，输出 Markdown。
- * 翻译通过 Google Translate 免费接口完成，无需 API key。
+ * 解析 git log，将提交内容发送给 LLM，生成高质量、易读的中文 Changelog。
+ * 支持任何 OpenAI 兼容接口，可通过环境变量配置（包括本项目自身的 gateway）。
+ *
+ * 环境变量：
+ *   LLM_API_URL   — API 基础 URL（默认 https://api.openai.com/v1）
+ *   LLM_API_KEY   — API 密钥（默认 OPENAI_API_KEY 环境变量）
+ *   LLM_MODEL     — 模型名称（默认 gpt-4o-mini）
  *
  * 用法：
  *   node scripts/generate-changelog-zh.mjs --version v0.2.0 --from v0.1.0
  *   node scripts/generate-changelog-zh.mjs --version v0.1.0          # 全部历史
  *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --stdout # 预览到 stdout
- *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --no-translate # 跳过翻译
+ *   node scripts/generate-changelog-zh.mjs --version v0.1.0 --no-llm # 跳过 LLM，用机械生成
  */
 
 import { execFileSync } from 'child_process';
@@ -36,13 +41,13 @@ const TYPE_MAP = {
 // ── 参数解析 ────────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
-  const args = { translate: true };
+  const args = { useLlm: true };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--from')         args.from = argv[++i];
-    else if (argv[i] === '--to')      args.to = argv[++i];
+    if (argv[i] === '--from')        args.from = argv[++i];
+    else if (argv[i] === '--to')     args.to = argv[++i];
     else if (argv[i] === '--version') args.version = argv[++i];
-    else if (argv[i] === '--stdout')  args.stdout = true;
-    else if (argv[i] === '--no-translate') args.translate = false;
+    else if (argv[i] === '--stdout') args.stdout = true;
+    else if (argv[i] === '--no-llm') args.useLlm = false;
   }
   return args;
 }
@@ -85,110 +90,110 @@ function parseCommit(commit) {
   );
   if (!match) return null;
   const { type, scope, breaking, desc } = match.groups;
-  // 过滤自动生成的 release 提交（chore(release): vX.X.X）
   if (type === 'chore' && scope === 'release') return null;
   const isBreaking = !!breaking || /^BREAKING CHANGE/m.test(commit.body);
   return { ...commit, type, scope, desc, isBreaking };
 }
 
-// ── 翻译 ────────────────────────────────────────────────────────────────────
+// ── LLM 生成 ────────────────────────────────────────────────────────────────
 
-/** 调用 Google Translate 非官方接口翻译单条文本（sl=en → tl=zh-CN）*/
-async function translateOne(text, retries = 3) {
-  const url =
-    'https://translate.googleapis.com/translate_a/single' +
-    `?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      // 响应格式：[ [ [translated, original], ... ], ... ]
-      return data[0].map((seg) => seg[0]).join('').trim();
-    } catch {
-      if (attempt < retries) {
-        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-      }
-    }
-  }
-  return text; // 翻译失败时保留原文
-}
+async function generateWithLlm(version, date, parsedCommits) {
+  const apiUrl = (process.env.LLM_API_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
+  const apiKey = process.env.LLM_API_KEY ?? process.env.OPENAI_API_KEY;
+  const model  = process.env.LLM_MODEL ?? 'gpt-4o-mini';
 
-/** 并发翻译多条文本（concurrency 控制并发数，避免触发限流）*/
-async function translateBatch(texts, concurrency = 5) {
-  const results = new Array(texts.length).fill('');
-  let cursor = 0;
-  let done = 0;
-
-  // 进度条
-  const showProgress = () => {
-    process.stderr.write(`\r[changelog-zh] 翻译进度：${done}/${texts.length} `);
-  };
-  showProgress();
-
-  async function worker() {
-    while (cursor < texts.length) {
-      const i = cursor++;
-      results[i] = await translateOne(texts[i]);
-      done++;
-      showProgress();
-    }
+  if (!apiKey) {
+    console.warn('[changelog-zh] 未设置 LLM_API_KEY，回退到机械生成模式。');
+    return null;
   }
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, texts.length) }, worker));
-  process.stderr.write('\n');
-  return results;
+  const commitLines = parsedCommits.map((c) => {
+    const scope = c.scope ? `(${c.scope})` : '';
+    const breaking = c.isBreaking ? ' [BREAKING]' : '';
+    return `${c.type}${scope}${breaking}: ${c.desc}${c.body ? '\n  > ' + c.body.split('\n').join('\n  > ') : ''}`;
+  }).join('\n');
+
+  const prompt = `你是一位技术写作专家，负责为一个开源项目编写高质量的中文 Changelog。
+
+项目介绍：这是一个 Next.js 实现的 OpenAI 兼容 API 代理网关（LLM Gateway），面向企业/团队，
+提供用户管理、分组权限、配额控制、使用量统计等功能，管理员通过 Web 后台管理，普通用户通过仪表盘查看使用情况。
+
+请根据以下 git 提交记录，为版本 ${version}（发布日期：${date}）编写一份**高质量、易读**的中文 Changelog。
+
+要求：
+- 将相关提交合并、归纳，用自然语言描述功能变更，而不是逐条列出提交信息
+- 按功能领域（而非提交类型）组织内容，使用清晰的小标题
+- 用中文技术写作风格，简洁而信息密度高
+- 输出纯 Markdown，不要加代码块包裹
+- 使用 emoji 图标让标题更醒目（✨ 新增 / 🐛 修复 / ⚡ 改进 / 📝 文档 / 🔧 工程）
+- 只输出版本内容部分（从 ### 小标题开始），不要输出 ## [版本] 标题行
+- 不要包含任何前言或解释性文字，直接输出 Markdown 内容
+
+提交记录：
+${commitLines}`;
+
+  process.stderr.write('[changelog-zh] 正在调用 LLM 生成中文 Changelog...\n');
+
+  const res = await fetch(`${apiUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(`[changelog-zh] LLM 调用失败 (HTTP ${res.status})，回退到机械生成模式。\n${text}`);
+    return null;
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content?.trim() ?? null;
 }
 
-// ── 格式化 ──────────────────────────────────────────────────────────────────
+// ── 机械生成（兜底） ─────────────────────────────────────────────────────────
 
 function formatEntry(parsed) {
   const scope = parsed.scope ? `**${parsed.scope}**: ` : '';
   const hash = parsed.hash.slice(0, 7);
-  const desc = parsed.descZh ?? parsed.desc;
-  return `- ${scope}${desc} (\`${hash}\`)`;
+  return `- ${scope}${parsed.desc} (\`${hash}\`)`;
 }
 
-async function buildSection(version, date, commits, doTranslate) {
-  const parsed = commits.map(parseCommit).filter(Boolean);
-
-  if (doTranslate && parsed.length > 0) {
-    const descs = parsed.map((c) => c.desc);
-    const translated = await translateBatch(descs);
-    parsed.forEach((c, i) => {
-      c.descZh = translated[i];
-    });
-  }
-
-  const breaking = parsed.filter((c) => c.isBreaking);
+function buildFallbackSection(parsedCommits) {
+  const breaking = parsedCommits.filter((c) => c.isBreaking);
   const byType = {};
-  for (const c of parsed) {
+  for (const c of parsedCommits) {
     if (!byType[c.type]) byType[c.type] = [];
     byType[c.type].push(c);
   }
 
   const lines = [];
-  lines.push(`## [${version}] - ${date}`);
-  lines.push('');
 
   if (breaking.length) {
-    lines.push('### ⚠️ 破坏性变更');
-    lines.push('');
+    lines.push('### ⚠️ 破坏性变更', '');
     for (const c of breaking) lines.push(formatEntry(c));
     lines.push('');
   }
 
   for (const [type, label] of Object.entries(TYPE_MAP)) {
     const items = byType[type];
-    if (!items || items.length === 0) continue;
-    lines.push(`### ${label}`);
-    lines.push('');
+    if (!items?.length) continue;
+    lines.push(`### ${label}`, '');
     for (const c of items) lines.push(formatEntry(c));
     lines.push('');
   }
 
   return lines.join('\n');
 }
+
+// ── 文件写入 ────────────────────────────────────────────────────────────────
 
 function prependToFile(filePath, section) {
   const HEADER =
@@ -220,13 +225,21 @@ if (commits.length === 0) {
   process.exit(0);
 }
 
-const section = await buildSection(version, date, commits, args.translate);
+const parsedCommits = commits.map(parseCommit).filter(Boolean);
+
+let bodyContent;
+if (args.useLlm) {
+  bodyContent = await generateWithLlm(version, date, parsedCommits);
+}
+if (!bodyContent) {
+  bodyContent = buildFallbackSection(parsedCommits);
+}
+
+const section = `## [${version}] - ${date}\n\n${bodyContent}`;
 
 if (args.stdout) {
   console.log(section);
 } else {
   prependToFile(OUTPUT, section);
-  console.log(
-    `[changelog-zh] 已更新 CHANGELOG-zh.md（${commits.length} 条提交${args.translate ? '，含机器翻译' : ''}）`
-  );
+  console.log(`[changelog-zh] 已更新 CHANGELOG-zh.md（${commits.length} 条提交）`);
 }

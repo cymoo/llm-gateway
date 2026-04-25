@@ -4,66 +4,67 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [v0.1.0] - 2026-04-25
+## [0.1.1] - 2026-04-25
 
-### ✨ 新功能
+### 🔧 工程改善
 
-- admin dashboard time range, perf indexes, users pagination, user model pie chart (`32ff991`)
-- **i18n**: add Chinese language support with sidebar language switcher (`449b944`)
-- **i18n**: migrate all admin and dashboard pages to use t() translations (`fbb9ba7`)
-- **ui**: add SearchableSelect component and extend users API with group info (`9108871`)
-- **users**: add view-as-user button to admin users list (`94d833d`)
-- **ui**: add Default group quota notice and replace Approve with Dashboard link (`6ad9211`)
-- **ui**: use SearchableSelect for user pickers in groups detail and usage pages (`3026018`)
-- **groups**: add members management to group detail page (`05c2c78`)
-- **groups**: improve groups page and add migration docs (`699e222`)
-- **groups**: add user group-based access control and quota management (`d5d3673`)
-- add password to register, use ADMIN_NAME in success msg, add HOST to no_proxy (`ac3bc2e`)
-- add user login page and dashboard with usage stats, quota info, API access, and Python examples (`b55fc93`)
-- add admin model-user modal and usage filter enhancements (`a317d9b`)
-- add remark field to users and models admin flows (`fbcd42e`)
-- add self-registration with admin approval flow (`1034c89`)
-- add csv export for usage request logs (`7ea40c1`)
-- add admin password validation, api key copy, alias relax and api tests (`9243acd`)
+- 新增版本号自动管理与双语 Changelog 自动生成工具（`npm run release` / `npm run changelog`）
+- 引入 commitlint + husky，提交时自动校验 Conventional Commits 规范
+
+---
+
+## [0.1.0] - 2026-04-25
+
+首个正式版本。包含完整的代理网关核心功能、管理后台、用户分组权限体系、用户自助门户及国际化支持。
+
+### ✨ 用户分组与权限管理
+
+完整的多租户分组体系，支持基于组的模型访问控制和配额管理：
+
+- 新增用户分组系统（Groups），组成员自动继承组级别的模型访问权限和使用配额
+- 管理员可在分组详情页增删成员；删除分组时，成员自动回归至 Default 组
+- Default 组作为兜底分组，其配额设置不影响成员（个人配额优先）
+- 管理后台提供完整的分组 CRUD API
+
+### ✨ 用户自助门户
+
+- 新增用户登录页面（`/login`）和注册页面（含管理员审批流程）
+- 新增用户仪表盘（`/dashboard`）：展示使用量趋势、剩余配额、API 密钥（含一键复制）及 Python/curl 示例代码
+- 仪表盘提供近 7 天各模型 Token 消耗饼图
+
+### ✨ 中英文国际化
+
+- 全站支持中英文切换，覆盖管理后台和用户仪表盘所有页面
+- 侧边栏和顶部导航均提供语言切换按钮
+- 语言优先级：localStorage 已保存偏好 → 浏览器语言 → 英文回退
+
+### ✨ 管理后台增强
+
+- 使用量仪表盘新增时间范围切换（7 / 14 / 30 天）
+- 用户列表支持分页，搜索和分页状态通过 URL 参数持久化
+- 新增「以用户身份查看」功能：管理员无需用户密码即可查看其仪表盘
+- 使用日志支持从用户列表一键跳转并自动过滤
+- 新增可搜索下拉选择器（SearchableSelect）组件，用于用户/模型选择场景
+- 请求日志中完整展示提示词内容（不再截断）
 
 ### 🐛 问题修复
 
-- **i18n**: prevent hydration mismatch from localStorage language detection (`8221e97`)
-- **ui**: link users list to usage logs page pre-filtered by user (`6875b45`)
-- allow password update for non-admin users (`48873dc`)
-- address code review feedback - use inArray, improve protocol detection (`4ac9a21`)
-- address review feedback for admin stats and filters (`140b64c`)
-- **admin**: show full request prompt in modal and stop truncating stored prompt (`1448ce4`)
-- handle non-string error.code in normalizeBackendError and load .env.test for e2e tests (`2703215`)
-- normalize confusing upstream proxy error messages (`f6295c8`)
-- ensure clipboard copy works across environments with fallback method (`c7a86be`)
-- handle admin users fetch safely and avoid SQL array query crash (`7a5b764`)
-- seed admin on first admin login request (`1f782ae`)
-- resolve usage tooltip typing and split readmes by language (`2024cfa`)
-- adjust dashboard tooltip formatters for Recharts ValueType (`393581e`)
-- resolve dashboard tooltip formatter type errors (`23fb7bc`)
+- 修复语言检测在 SSR 与 CSR 之间的 hydration 不匹配（React 水合错误）
+- 修复非管理员用户在管理后台无法更新密码的问题
+- 修复上游代理错误消息过于技术化、不友好的问题
+- 修复跨环境（HTTPS / 无 `navigator.clipboard`）剪贴板复制失败
+- 修复用户列表 SQL 数组查询在空条件下崩溃
+- 修复管理员首次登录时未触发 seed 的问题
+- 修复 Recharts 图表 tooltip 格式化函数类型错误
 
-### ♻️ 代码重构
+### 📝 文档
 
-- simplify login seed trigger without process flag (`25cbb90`)
+- 新增中文系统架构设计文档
+- README（中英文）详细补充项目初始化、数据库配置及生产部署说明
+- 说明 `npm run migrate` 在生产环境的迁移工作流
 
-### 📝 文档更新
+### 🔧 基础设施
 
-- clarify password settings copy (`10a5871`)
-- add high-level system design documentation (`74f50c2`)
-- rewrite README with detailed project and database setup guide (`dcb003c`)
-
-### ✅ 测试
-
-- cover upstream rate-limit error normalization (`3548944`)
-
-### 🔧 杂项
-
-- **husky**: add pre-commit test hook (`c2b7f9b`)
-- add versioning and changelog tooling (`055572c`)
-- **db**: add npm run migrate script for deployment (`f8b958a`)
-- add copilot instruction (`93bc8e1`)
-- address review feedback and finalize validation (`987c70f`)
-- clean up redundant test-related notes (`071d9fb`)
-- address review feedback for validation reuse and clipboard fallback (`df87af5`)
-
+- 新增数据库查询性能索引（`idx_daily_usage_date`、`idx_usage_logs_created_at`）
+- 使用量概览 API 增加 5 分钟内存 TTL 缓存，减少重复 DB 查询
+- 新增 `npm run migrate` 命令，封装 drizzle-kit migrator 用于生产部署

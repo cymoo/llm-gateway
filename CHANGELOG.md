@@ -1,78 +1,71 @@
-## <small>0.1.1 (2026-04-25)</small>
+# Changelog
 
+All notable changes to this project will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-04-25
 
-## 0.1.0 (2026-04-25)
+### Infrastructure
 
-* chore: add copilot instruction ([93bc8e1](https://github.com/cymoo/llm-gateway/commit/93bc8e1))
-* chore: add versioning and changelog tooling ([055572c](https://github.com/cymoo/llm-gateway/commit/055572c))
-* chore: address review feedback and finalize validation ([987c70f](https://github.com/cymoo/llm-gateway/commit/987c70f))
-* chore: address review feedback for validation reuse and clipboard fallback ([df87af5](https://github.com/cymoo/llm-gateway/commit/df87af5))
-* chore: clean up redundant test-related notes ([071d9fb](https://github.com/cymoo/llm-gateway/commit/071d9fb))
-* chore(db): add npm run migrate script for deployment ([f8b958a](https://github.com/cymoo/llm-gateway/commit/f8b958a))
-* chore(husky): add pre-commit test hook ([c2b7f9b](https://github.com/cymoo/llm-gateway/commit/c2b7f9b))
-* fix: address code review feedback - use inArray, improve protocol detection ([4ac9a21](https://github.com/cymoo/llm-gateway/commit/4ac9a21))
-* fix: address review feedback for admin stats and filters ([140b64c](https://github.com/cymoo/llm-gateway/commit/140b64c))
-* fix: adjust dashboard tooltip formatters for Recharts ValueType ([393581e](https://github.com/cymoo/llm-gateway/commit/393581e))
-* fix: allow password update for non-admin users ([48873dc](https://github.com/cymoo/llm-gateway/commit/48873dc))
-* fix: ensure clipboard copy works across environments with fallback method ([c7a86be](https://github.com/cymoo/llm-gateway/commit/c7a86be))
-* fix: handle admin users fetch safely and avoid SQL array query crash ([7a5b764](https://github.com/cymoo/llm-gateway/commit/7a5b764))
-* fix: handle non-string error.code in normalizeBackendError and load .env.test for e2e tests ([2703215](https://github.com/cymoo/llm-gateway/commit/2703215))
-* fix: normalize confusing upstream proxy error messages ([f6295c8](https://github.com/cymoo/llm-gateway/commit/f6295c8))
-* fix: resolve dashboard tooltip formatter type errors ([23fb7bc](https://github.com/cymoo/llm-gateway/commit/23fb7bc))
-* fix: resolve usage tooltip typing and split readmes by language ([2024cfa](https://github.com/cymoo/llm-gateway/commit/2024cfa))
-* fix: seed admin on first admin login request ([1f782ae](https://github.com/cymoo/llm-gateway/commit/1f782ae))
-* fix(admin): show full request prompt in modal and stop truncating stored prompt ([1448ce4](https://github.com/cymoo/llm-gateway/commit/1448ce4))
-* fix(i18n): prevent hydration mismatch from localStorage language detection ([8221e97](https://github.com/cymoo/llm-gateway/commit/8221e97))
-* feat: add admin model-user modal and usage filter enhancements ([a317d9b](https://github.com/cymoo/llm-gateway/commit/a317d9b))
-* feat: add admin password validation, api key copy, alias relax and api tests ([9243acd](https://github.com/cymoo/llm-gateway/commit/9243acd))
-* feat: add csv export for usage request logs ([7ea40c1](https://github.com/cymoo/llm-gateway/commit/7ea40c1))
-* feat: add password to register, use ADMIN_NAME in success msg, add HOST to no_proxy ([ac3bc2e](https://github.com/cymoo/llm-gateway/commit/ac3bc2e))
-* feat: add remark field to users and models admin flows ([fbcd42e](https://github.com/cymoo/llm-gateway/commit/fbcd42e))
-* feat: add self-registration with admin approval flow ([1034c89](https://github.com/cymoo/llm-gateway/commit/1034c89))
-* feat: add user login page and dashboard with usage stats, quota info, API access, and Python example ([b55fc93](https://github.com/cymoo/llm-gateway/commit/b55fc93))
-* feat: admin dashboard time range, perf indexes, users pagination, user model pie chart ([32ff991](https://github.com/cymoo/llm-gateway/commit/32ff991))
-* feat(groups): add members management to group detail page ([05c2c78](https://github.com/cymoo/llm-gateway/commit/05c2c78))
-* feat(groups): add user group-based access control and quota management ([d5d3673](https://github.com/cymoo/llm-gateway/commit/d5d3673))
-* feat(groups): improve groups page and add migration docs ([699e222](https://github.com/cymoo/llm-gateway/commit/699e222))
-* feat(i18n): add Chinese language support with sidebar language switcher ([449b944](https://github.com/cymoo/llm-gateway/commit/449b944))
-* feat(i18n): migrate all admin and dashboard pages to use t() translations ([fbb9ba7](https://github.com/cymoo/llm-gateway/commit/fbb9ba7))
-* feat(ui): add Default group quota notice and replace Approve with Dashboard link ([6ad9211](https://github.com/cymoo/llm-gateway/commit/6ad9211))
-* feat(ui): add SearchableSelect component and extend users API with group info ([9108871](https://github.com/cymoo/llm-gateway/commit/9108871))
-* feat(ui): use SearchableSelect for user pickers in groups detail and usage pages ([3026018](https://github.com/cymoo/llm-gateway/commit/3026018))
-* feat(users): add view-as-user button to admin users list ([94d833d](https://github.com/cymoo/llm-gateway/commit/94d833d))
-* docs: add high-level system design documentation ([74f50c2](https://github.com/cymoo/llm-gateway/commit/74f50c2))
-* docs: clarify password settings copy ([10a5871](https://github.com/cymoo/llm-gateway/commit/10a5871))
-* docs: rewrite README with detailed project and database setup guide ([dcb003c](https://github.com/cymoo/llm-gateway/commit/dcb003c))
-* Add real-request gateway e2e tests, k6 smoke test, and .env.test.example ([3d88b07](https://github.com/cymoo/llm-gateway/commit/3d88b07))
-* Address code review feedback: optimize message iteration and extract truncation constant ([51678f8](https://github.com/cymoo/llm-gateway/commit/51678f8))
-* Fix e2e test config, simplify DB env vars, fix rate-limiter bug, update READMEs ([ca75ada](https://github.com/cymoo/llm-gateway/commit/ca75ada))
-* Fix misleading comment in rate-limiter test ([72ffa71](https://github.com/cymoo/llm-gateway/commit/72ffa71))
-* Fix model deletion, show full API key in edit form, add prompt preview and client IP to usage logs ([147b825](https://github.com/cymoo/llm-gateway/commit/147b825))
-* Implement LLM Gateway application (Next.js 16, Drizzle ORM, shadcn/ui) ([61ff9c3](https://github.com/cymoo/llm-gateway/commit/61ff9c3))
-* Initial commit ([7fa42b5](https://github.com/cymoo/llm-gateway/commit/7fa42b5))
-* Initial plan ([479e16b](https://github.com/cymoo/llm-gateway/commit/479e16b))
-* Initial plan ([3698c5e](https://github.com/cymoo/llm-gateway/commit/3698c5e))
-* Initial plan ([a9ea33b](https://github.com/cymoo/llm-gateway/commit/a9ea33b))
-* Initial plan ([e6a978a](https://github.com/cymoo/llm-gateway/commit/e6a978a))
-* Initial plan ([2ab6df3](https://github.com/cymoo/llm-gateway/commit/2ab6df3))
-* Initial plan ([f9f17e5](https://github.com/cymoo/llm-gateway/commit/f9f17e5))
-* Initial plan ([907d86a](https://github.com/cymoo/llm-gateway/commit/907d86a))
-* Initial plan ([13c0746](https://github.com/cymoo/llm-gateway/commit/13c0746))
-* Initial plan ([f0ec9b1](https://github.com/cymoo/llm-gateway/commit/f0ec9b1))
-* Initial plan ([9344f4e](https://github.com/cymoo/llm-gateway/commit/9344f4e))
-* Initial plan ([64641e8](https://github.com/cymoo/llm-gateway/commit/64641e8))
-* Initial plan ([ff910d4](https://github.com/cymoo/llm-gateway/commit/ff910d4))
-* Initial plan ([b4e22a2](https://github.com/cymoo/llm-gateway/commit/b4e22a2))
-* Initial plan ([5db7e64](https://github.com/cymoo/llm-gateway/commit/5db7e64))
-* Initial plan ([68df499](https://github.com/cymoo/llm-gateway/commit/68df499))
-* redesign /admin/users/ page with modern visual style ([8756d27](https://github.com/cymoo/llm-gateway/commit/8756d27))
-* redesign /dashboard page and add no_proxy to code examples ([089e058](https://github.com/cymoo/llm-gateway/commit/089e058))
-* redesign admin/users/new and admin/users/[id] with modern visual style and dedicated Password Settin ([a3c4599](https://github.com/cymoo/llm-gateway/commit/a3c4599))
-* Update MODEL_ALIAS_PATTERN to allow forward slashes ([712b096](https://github.com/cymoo/llm-gateway/commit/712b096))
-* test: cover upstream rate-limit error normalization ([3548944](https://github.com/cymoo/llm-gateway/commit/3548944))
-* refactor: simplify login seed trigger without process flag ([25cbb90](https://github.com/cymoo/llm-gateway/commit/25cbb90))
+- Added automated versioning and bilingual changelog generation (`npm run release` / `npm run changelog`)
+- Added commitlint + husky to enforce Conventional Commits format on every commit
 
+---
 
+## [0.1.0] - 2026-04-25
 
+Initial release. Includes the full proxy gateway core, admin dashboard, group-based access control, user self-service portal, and i18n support.
+
+### Added: Group-Based Access Control
+
+A complete multi-tenant group system for managing model access and quotas:
+
+- New Groups system — members inherit the group's model access permissions and usage quotas automatically
+- Admins can add/remove members from a group's detail page; deleting a group moves members to the Default group
+- The Default group acts as a fallback; its quota settings do not restrict members (individual quotas take precedence)
+- Full CRUD API for group management in the admin dashboard
+
+### Added: User Self-Service Portal
+
+- New user login page (`/login`) and registration page with admin approval workflow
+- New user dashboard (`/dashboard`) showing usage trends, remaining quota, API key (with one-click copy), and Python/curl code examples
+- Dashboard includes a pie chart of per-model token consumption for the last 7 days
+
+### Added: Chinese / English Internationalization
+
+- Full i18n support across both the admin dashboard and user portal
+- Language switcher available in the sidebar and top navigation
+- Language priority: saved localStorage preference → browser language → English fallback
+
+### Improved: Admin Dashboard
+
+- Usage dashboard now supports time range selection (7 / 14 / 30 days)
+- User list supports pagination with search and page state persisted in the URL
+- New "View as User" feature — admins can preview a user's dashboard without their password
+- Usage logs support one-click navigation from the user list with auto-applied filter
+- New `SearchableSelect` component for user/model pickers throughout the admin UI
+- Request prompt is now shown in full in the usage log modal (no longer truncated)
+
+### Fixed
+
+- SSR/CSR hydration mismatch caused by localStorage-based language detection
+- Non-admin users were unable to update their own password
+- Upstream proxy error messages were overly technical and confusing; now normalized to user-friendly text
+- Clipboard copy failed in environments without `navigator.clipboard` (e.g., HTTP); added fallback
+- SQL array query crash when fetching the admin user list under certain conditions
+- Admin seed was not triggered on the first admin login request
+- Recharts tooltip formatter type errors in the dashboard charts
+
+### Documentation
+
+- Added a Chinese system architecture design document
+- README (both English and Chinese) now includes detailed setup, database configuration, and production deployment guides
+- Documents the `npm run migrate` workflow for production deployments
+
+### Infrastructure
+
+- Added database query performance indexes (`idx_daily_usage_date`, `idx_usage_logs_created_at`)
+- Usage overview API now uses a 5-minute in-memory TTL cache to reduce redundant DB queries
+- New `npm run migrate` script wrapping drizzle-kit migrator for production deployments
