@@ -93,6 +93,24 @@ Unit tests do not require a running database — all DB calls are mocked.
 ### Streaming
 The proxy uses a `TransformStream` (`src/lib/proxy/stream.ts`) to pass SSE chunks through while parsing usage from the final chunk. Usage is recorded via the `onComplete` callback in `flush()`.
 
+## Changelog & Release Workflow
+
+When the user asks to write a changelog or cut a release:
+
+1. **Determine the version** — run `git describe --tags --abbrev=0` to get the last tag, then use `conventional-recommended-bump` (or inspect commits manually) to suggest the next SemVer version. **Always confirm the proposed version with the user before proceeding.**
+
+2. **Collect commits** — run `git log <last-tag>..HEAD --format="%H|%s|%b"` (or use the existing `scripts/generate-changelog-zh.mjs --stdout` for a quick list).
+
+3. **Write both changelogs directly** — do not call any external API or translation service. As an AI, write the content yourself:
+   - **`CHANGELOG.md`** (English) — grouped by feature area, natural prose, Keep a Changelog format
+   - **`CHANGELOG-zh.md`** (Chinese) — same structure, written in fluent Chinese technical style; do not mechanically translate, write it as a native speaker would
+
+4. **Apply the files** — edit `CHANGELOG.md` and `CHANGELOG-zh.md` directly, prepending the new version section.
+
+5. **Commit** — run `npm run release -- --changelog-only` if only updating changelogs, or bump `package.json` version, commit, and tag if doing a full release.
+
+**Quality bar**: Group related commits into themes (not per-commit bullet lists). Use emoji section headers (✨ / 🐛 / ⚡ / 📝 / 🔧). Write for a reader who wants to know *what changed and why*, not just the raw commit messages.
+
 ## Test-First for Changes
 
 Before refactoring existing code or implementing a new feature, add or update test cases first. This ensures regressions are caught and the intended behavior is clearly defined before code changes begin.
