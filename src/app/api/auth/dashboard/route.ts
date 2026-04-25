@@ -202,6 +202,35 @@ export async function GET(req: NextRequest) {
 
   const usageMap = new Map(todayModelUsage.map((u) => [u.modelId, u]));
 
+  // Per-model token usage over last 7 days for pie chart
+  const modelStats =
+    modelIds.length > 0
+      ? await db
+          .select({
+            modelId: dailyUsage.modelId,
+            totalTokens: sql<number>`coalesce(sum(${dailyUsage.totalTokens}), 0)`,
+            requestCount: sql<number>`coalesce(sum(${dailyUsage.requestCount}), 0)`,
+          })
+          .from(dailyUsage)
+          .where(
+            and(
+              eq(dailyUsage.userId, userId),
+              sql`${dailyUsage.date} >= ${date7}`,
+              inArray(dailyUsage.modelId, modelIds)
+            )
+          )
+          .groupBy(dailyUsage.modelId)
+      : [];
+
+  const modelAliasMap = new Map(authorizedModels.map((m) => [m.modelId, m.alias]));
+  const modelStatsMapped = modelStats
+    .map((s) => ({
+      alias: modelAliasMap.get(s.modelId ?? "") ?? s.modelId ?? "",
+      totalTokens: Number(s.totalTokens),
+      requestCount: Number(s.requestCount),
+    }))
+    .filter((s) => s.totalTokens > 0 || s.requestCount > 0);
+
   const modelsWithQuotas = authorizedModels.map((m) => {
     const override = quotaMap.get(m.modelId);
     const usage = usageMap.get(m.modelId);
@@ -247,6 +276,7 @@ export async function GET(req: NextRequest) {
     },
     dailyTrend,
     models: modelsWithQuotas,
+    modelStats: modelStatsMapped,
     baseUrl,
   });
 }

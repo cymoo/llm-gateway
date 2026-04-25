@@ -137,6 +137,7 @@ export const usageLogs = pgTable(
   (table) => [
     index("idx_usage_logs_user_created").on(table.userId, table.createdAt),
     index("idx_usage_logs_model_created").on(table.modelId, table.createdAt),
+    index("idx_usage_logs_created_at").on(table.createdAt),
   ]
 );
 
@@ -157,6 +158,7 @@ export const dailyUsage = pgTable(
       table.modelId,
       table.date
     ),
+    index("idx_daily_usage_date").on(table.date),
   ]
 );
 

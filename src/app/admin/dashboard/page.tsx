@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Users,
   Cpu,
@@ -33,6 +32,8 @@ interface OverviewData {
   successRate7Days: number;
   dailyTrend: Array<{ date: string; totalTokens: number; requestCount: number }>;
 }
+
+type TrendDays = 7 | 14 | 30;
 
 function StatCard({
   title,
@@ -83,17 +84,49 @@ function formatTooltipNumber(value: unknown): string {
   return Number.isFinite(num) ? formatNum(num) : "N/A";
 }
 
+function fillDateRange(
+  trend: Array<{ date: string; totalTokens: number; requestCount: number }>,
+  days: number
+) {
+  const dataMap = new Map(trend.map((d) => [d.date, d]));
+  const result = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().split("T")[0];
+    result.push(
+      dataMap.get(dateStr) ?? { date: dateStr, totalTokens: 0, requestCount: 0 }
+    );
+  }
+  return result;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trendDays, setTrendDays] = useState<TrendDays>(7);
+  const abortRef = useRef<AbortController | null>(null);
   const { t } = useLanguage();
 
   useEffect(() => {
-    fetch("/api/admin/usage/overview")
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+    fetch(`/api/admin/usage/overview?days=${trendDays}`, {
+      signal: controller.signal,
+    })
       .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, []);
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") setLoading(false);
+      });
+    return () => controller.abort();
+  }, [trendDays]);
 
   if (loading) {
     return (
@@ -104,6 +137,8 @@ export default function DashboardPage() {
   }
 
   if (!data) return null;
+
+  const filledTrend = fillDateRange(data.dailyTrend, trendDays);
 
   return (
     <div className="space-y-6">
@@ -171,74 +206,98 @@ export default function DashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              {t("dashboard.requestTrend7d")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={data.dailyTrend}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(v) => v.slice(5)}
-                />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value) => [formatTooltipNumber(value), t("dashboard.requests")]}
-                  labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="requestCount"
-                  stroke="hsl(221.2, 83.2%, 53.3%)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {/* Trend Charts with time range selector */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">
+            {t("dashboard.trendRange")}
+          </h2>
+          <div className="flex gap-1">
+            {([7, 14, 30] as TrendDays[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setTrendDays(d)}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  trendDays === d
+                    ? "bg-blue-600 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:hover:bg-slate-600"
+                }`}
+              >
+                {d}D
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                {t("dashboard.requestTrendDays", { days: trendDays })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={filledTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => v.slice(5)}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value) => [formatTooltipNumber(value), t("dashboard.requests")]}
+                    labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="requestCount"
+                    stroke="hsl(221.2, 83.2%, 53.3%)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Coins className="h-4 w-4" />
-              {t("dashboard.tokenTrend7d")}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={data.dailyTrend}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(v) => v.slice(5)}
-                />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={formatNum} />
-                <Tooltip
-                  formatter={(value) => [formatTooltipNumber(value), t("dashboard.tokens")]}
-                  labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="totalTokens"
-                  stroke="hsl(25, 95%, 53%)"
-                  strokeWidth={2}
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Coins className="h-4 w-4" />
+                {t("dashboard.tokenTrendDays", { days: trendDays })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={filledTrend}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(v) => v.slice(5)}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} tickFormatter={formatNum} />
+                  <Tooltip
+                    formatter={(value) => [formatTooltipNumber(value), t("dashboard.tokens")]}
+                    labelFormatter={(l) => `${t("dashboard.date")}: ${l}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="totalTokens"
+                    stroke="hsl(25, 95%, 53%)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
+      {/* Bottom stat cards — cumulative & 30-day summaries */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-6">
@@ -271,30 +330,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6 flex flex-col gap-2">
+          <CardContent className="p-6">
             <p className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
-              {t("dashboard.quickLinks")}
+              {t("dashboard.allTimeTokens")}
             </p>
-            <div className="flex gap-2 flex-wrap">
-              <Link
-                href="/admin/users/new"
-                className="text-sm text-[hsl(var(--primary))] hover:underline"
-              >
-                {t("dashboard.addUser")}
-              </Link>
-              <Link
-                href="/admin/models/new"
-                className="text-sm text-[hsl(var(--primary))] hover:underline"
-              >
-                {t("dashboard.addModel")}
-              </Link>
-              <Link
-                href="/admin/usage"
-                className="text-sm text-[hsl(var(--primary))] hover:underline"
-              >
-                {t("dashboard.viewUsage")}
-              </Link>
-            </div>
+            <p className="text-2xl font-bold mt-1">
+              {formatNum(data.allTime.totalTokens)}
+            </p>
           </CardContent>
         </Card>
       </div>

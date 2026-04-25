@@ -29,9 +29,19 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 import { copyToClipboard } from "@/lib/utils/clipboard";
 import { useLanguage } from "@/lib/i18n";
+
+interface ModelStat {
+  alias: string;
+  totalTokens: number;
+  requestCount: number;
+}
 
 interface ModelInfo {
   alias: string;
@@ -66,8 +76,14 @@ interface DashboardData {
   };
   dailyTrend: Array<{ date: string; totalTokens: number; requestCount: number }>;
   models: ModelInfo[];
+  modelStats: ModelStat[];
   baseUrl: string;
 }
+
+const PIE_COLORS = [
+  "#6366f1", "#f97316", "#10b981", "#3b82f6",
+  "#f59e0b", "#ec4899", "#14b8a6", "#8b5cf6",
+];
 
 function formatNum(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
@@ -432,6 +448,52 @@ for chunk in stream:
                   </LineChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          )}
+
+          {/* Per-model token distribution (pie chart) */}
+          {data.modelStats.length > 0 ? (
+            <div className="mt-4 rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-5 dark:border-slate-700/60 dark:bg-slate-800/50">
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-4 flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-indigo-500" />
+                {t("userDashboard.modelDistributionTitle")}
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={data.modelStats}
+                    dataKey="totalTokens"
+                    nameKey="alias"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    label={({ name, percent }) =>
+                      `${name} ${((percent ?? 0) * 100).toFixed(0)}%`
+                    }
+                    labelLine={false}
+                  >
+                    {data.modelStats.map((_, index) => (
+                      <Cell
+                        key={index}
+                        fill={PIE_COLORS[index % PIE_COLORS.length]}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value) => [formatTooltipNumber(value), t("userDashboard.tokens")]}
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "12px" }}
+                  />
+                  <Legend
+                    formatter={(value) => (
+                      <span className="text-xs text-slate-600 dark:text-slate-300">{value}</span>
+                    )}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-5 dark:border-slate-700/60 dark:bg-slate-800/50 flex items-center justify-center text-slate-400 text-sm py-8">
+              {t("userDashboard.noModelUsage")}
             </div>
           )}
         </div>

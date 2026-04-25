@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -44,14 +45,18 @@ function formatNum(n: number): string {
   return n.toString();
 }
 
-export default function UsersPage() {
+function UsersContent() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const search = searchParams.get("search") ?? "";
+
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput, setSearchInput] = useState(search);
   const [loading, setLoading] = useState(true);
 
   const limit = 20;
@@ -89,10 +94,26 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // Keep searchInput in sync when URL search changes (e.g., back navigation)
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  const buildUrl = (newPage: number, newSearch: string) => {
+    const params = new URLSearchParams();
+    if (newSearch) params.set("search", newSearch);
+    if (newPage > 1) params.set("page", newPage.toString());
+    const qs = params.toString();
+    return `/admin/users${qs ? `?${qs}` : ""}`;
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
+    router.push(buildUrl(1, searchInput), { scroll: false });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    router.push(buildUrl(newPage, search), { scroll: false });
   };
 
   const handleDelete = async (id: string, name: string) => {
@@ -339,7 +360,7 @@ export default function UsersPage() {
               variant="outline"
               size="sm"
               disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
+              onClick={() => handlePageChange(page - 1)}
               className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -351,7 +372,7 @@ export default function UsersPage() {
               variant="outline"
               size="sm"
               disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => handlePageChange(page + 1)}
               className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
               <ChevronRight className="h-4 w-4" />
@@ -360,6 +381,14 @@ export default function UsersPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function UsersPage() {
+  return (
+    <Suspense>
+      <UsersContent />
+    </Suspense>
   );
 }
 

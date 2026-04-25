@@ -4,12 +4,34 @@ import { users, models, dailyUsage, usageLogs } from "@/lib/db/schema";
 import { sql, gte, count } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _overviewCache:
+    | Map<string, { data: unknown; expiresAt: number }>
+    | undefined;
+}
+if (!globalThis._overviewCache) globalThis._overviewCache = new Map();
+
 export async function GET(req: NextRequest) {
   const admin = await getAdminUser(req);
   if (!admin) return unauthorizedResponse();
 
+  const rawDays = Number(req.nextUrl.searchParams.get("days") ?? "7");
+  const days = ([7, 14, 30] as number[]).includes(rawDays) ? rawDays : 7;
+
+  const cached = globalThis._overviewCache!.get(`overview_${days}`);
+  if (cached && cached.expiresAt > Date.now()) {
+    return Response.json(cached.data);
+  }
+
   const now = new Date();
   const today = now.toISOString().split("T")[0];
+
+  const dN = new Date(now);
+  dN.setDate(dN.getDate() - (days - 1));
+  const dateN = dN.toISOString().split("T")[0];
 
   const d7 = new Date(now);
   d7.setDate(d7.getDate() - 6);
@@ -85,12 +107,12 @@ export async function GET(req: NextRequest) {
         requestCount: sql<number>`coalesce(sum(${dailyUsage.requestCount}), 0)`,
       })
       .from(dailyUsage)
-      .where(sql`${dailyUsage.date} >= ${date7}`)
+      .where(sql`${dailyUsage.date} >= ${dateN}`)
       .groupBy(dailyUsage.date)
       .orderBy(dailyUsage.date),
   ]);
 
-  return Response.json({
+  const result = {
     totalUsers: totalUsers[0].count,
     totalModels: totalModels[0].count,
     activeModels: activeModels[0].count,
@@ -117,9 +139,18 @@ export async function GET(req: NextRequest) {
     successRate7Days:
       recentLogStats[0].total > 0
         ? Number(
-            ((recentLogStats[0].success / recentLogStats[0].total) * 100).toFixed(1)
+            (
+              (recentLogStats[0].success / recentLogStats[0].total) *
+              100
+            ).toFixed(1)
           )
         : 0,
     dailyTrend,
+  };
+
+  globalThis._overviewCache!.set(`overview_${days}`, {
+    data: result,
+    expiresAt: Date.now() + CACHE_TTL_MS,
   });
+  return Response.json(result);
 }
