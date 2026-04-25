@@ -88,16 +88,15 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     );
   }
 
-  const [{ memberCount }] = await db
-    .select({ memberCount: count(users.id) })
-    .from(users)
-    .where(eq(users.groupId, id));
+  const defaultGroup = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.isDefault, true))
+    .limit(1);
+  const defaultGroupId = defaultGroup[0]?.id;
 
-  if (memberCount > 0) {
-    return Response.json(
-      { error: "Cannot delete a group that has members. Reassign users first." },
-      { status: 409 }
-    );
+  if (defaultGroupId) {
+    await db.update(users).set({ groupId: defaultGroupId }).where(eq(users.groupId, id));
   }
 
   await db.delete(groups).where(eq(groups.id, id));

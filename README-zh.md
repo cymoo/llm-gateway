@@ -58,6 +58,21 @@ npx drizzle-kit generate
 npx drizzle-kit migrate
 ```
 
+> **注意：** `npx drizzle-kit migrate` 需要数据库用户拥有 `CREATE ON DATABASE` 权限（用于创建 `drizzle` 追踪 schema）。如果命令静默执行但未应用迁移，请先授权：
+> ```sql
+> GRANT CREATE ON DATABASE <数据库名> TO <用户名>;
+> ```
+
+在生产环境中（未安装 `devDependencies`），请改用内置迁移脚本：
+
+```bash
+npm run migrate
+```
+
+该命令运行 `src/lib/db/migrate.ts`，使用 `drizzle-orm`（生产依赖）内置的迁移器，无需 `drizzle-kit`。
+
+> **修改表结构：** 修改 `src/lib/db/schema.ts` 后，运行 `npx drizzle-kit generate` 生成迁移文件，然后用 `npx drizzle-kit migrate`（开发）或 `npm run migrate`（生产）应用迁移。
+
 如 PostgreSQL 未启用 `pgcrypto`，请先执行：
 
 ```sql

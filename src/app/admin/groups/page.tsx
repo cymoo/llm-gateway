@@ -7,6 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface Group {
   id: string;
@@ -17,6 +32,13 @@ interface Group {
   createdAt: string;
 }
 
+interface GroupMember {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
 export default function GroupsPage() {
   const { toast } = useToast();
   const [groups, setGroups] = useState<Group[]>([]);
@@ -25,6 +47,9 @@ export default function GroupsPage() {
   const [newName, setNewName] = useState("");
   const [newRemark, setNewRemark] = useState("");
   const [creating, setCreating] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<{ id: string; name: string } | null>(null);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -39,6 +64,17 @@ export default function GroupsPage() {
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  const openMembersDialog = async (group: Group) => {
+    setSelectedGroup({ id: group.id, name: group.name });
+    setLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/admin/groups/${group.id}/members`);
+      setGroupMembers(res.ok ? await res.json() : []);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -69,15 +105,10 @@ export default function GroupsPage() {
       toast({ title: "Cannot delete the Default group", variant: "destructive" });
       return;
     }
-    if (group.memberCount > 0) {
-      toast({
-        title: "Cannot delete",
-        description: `This group has ${group.memberCount} member(s). Reassign them first.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!confirm(`Delete group "${group.name}"?`)) return;
+    const msg = group.memberCount > 0
+      ? `Delete group "${group.name}"? Its ${group.memberCount} member(s) will be moved to the Default group.`
+      : `Delete group "${group.name}"?`;
+    if (!confirm(msg)) return;
     const res = await fetch(`/api/admin/groups/${group.id}`, { method: "DELETE" });
     if (res.ok || res.status === 204) {
       toast({ title: "Group deleted" });
@@ -185,24 +216,31 @@ export default function GroupsPage() {
                     {g.remark || "—"}
                   </td>
                   <td className="py-3 px-5 text-slate-500 dark:text-slate-400">
-                    {g.memberCount}
+                    <button
+                      type="button"
+                      className="text-violet-600 hover:underline dark:text-violet-400"
+                      onClick={() => openMembersDialog(g)}
+                    >
+                      {g.memberCount}
+                    </button>
                   </td>
                   <td className="py-3 px-5">
                     <div className="flex gap-1 justify-end">
                       <Link href={`/admin/groups/${g.id}`}>
                         <Button
                           variant="ghost"
-                          size="sm"
-                          className="h-7 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
+                          size="icon"
+                          title="Edit"
+                          className="h-7 w-7 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
                         >
-                          <Pencil className="h-3.5 w-3.5 mr-1" />
-                          Edit
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
                       {!g.isDefault && (
                         <Button
                           variant="ghost"
                           size="icon"
+                          title="Delete"
                           onClick={() => handleDelete(g)}
                           className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                         >
@@ -217,6 +255,63 @@ export default function GroupsPage() {
           </table>
         )}
       </div>
+
+      <Dialog
+        open={selectedGroup !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedGroup(null);
+            setGroupMembers([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Group Members</DialogTitle>
+            <DialogDescription>
+              {selectedGroup ? `Group: ${selectedGroup.name}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border max-h-[60vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingMembers ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-slate-400">
+                      Loading...
+                    </TableCell>
+                  </TableRow>
+                ) : groupMembers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-slate-400">
+                      No members
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  groupMembers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="text-slate-500">{user.email}</TableCell>
+                      <TableCell>
+                        <span className={user.isActive ? "text-green-600" : "text-slate-400"}>
+                          {user.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -76,6 +76,21 @@ npx drizzle-kit generate
 npx drizzle-kit migrate
 ```
 
+> **Note:** `npx drizzle-kit migrate` requires the database user to have `CREATE ON DATABASE` permission (to create the `drizzle` tracking schema). If the command runs silently without applying migrations, grant the permission first:
+> ```sql
+> GRANT CREATE ON DATABASE <your_db> TO <your_user>;
+> ```
+
+For production deployments where `devDependencies` are not installed, use the programmatic migrate script instead:
+
+```bash
+npm run migrate
+```
+
+This runs `src/lib/db/migrate.ts` using `drizzle-orm`'s built-in migrator (a production dependency), so it works without `drizzle-kit`.
+
+> **Schema changes:** When you modify `src/lib/db/schema.ts`, run `npx drizzle-kit generate` to generate a new migration file, then apply it with `npx drizzle-kit migrate` (dev) or `npm run migrate` (production).
+
 If your PostgreSQL does not enable `pgcrypto`, run:
 
 ```sql
