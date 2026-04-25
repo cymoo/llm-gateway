@@ -11,7 +11,10 @@
     "test:watch": "vitest",
     "test:e2e:real": "vitest run --config vitest.e2e.config.ts tests/e2e/gateway.real.e2e.test.ts",
     "test:perf:smoke": "k6 run k6/gateway-smoke.js",
-    "migrate": "tsx --env-file=.env src/lib/db/migrate.ts"
+    "migrate": "tsx --env-file=.env src/lib/db/migrate.ts",
+    "release": "node scripts/release.mjs",
+    "changelog": "node scripts/release.mjs --changelog-only",
+    "prepare": "husky"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.11",
@@ -44,14 +47,19 @@
     "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.2",
+    "@commitlint/config-conventional": "^20.5.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "conventional-changelog-cli": "^4.1.0",
+    "conventional-recommended-bump": "^11.2.0",
     "dotenv": "^17.3.1",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
+    "husky": "^9.1.7",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.0"
