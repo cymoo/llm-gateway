@@ -4,6 +4,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react";
 import en, { type Translations } from "./locales/en";
@@ -14,7 +15,6 @@ type Lang = "en" | "zh";
 const locales: Record<Lang, Translations> = { en, zh };
 
 function detectLang(): Lang {
-  if (typeof window === "undefined") return "en";
   const stored = localStorage.getItem("lang");
   if (stored === "en" || stored === "zh") return stored;
   if (navigator.language.toLowerCase().startsWith("zh")) return "zh";
@@ -63,10 +63,13 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Lazy initializer: runs once on first render.
-  // detectLang() returns "en" on the server (typeof window === "undefined" guard)
-  // and the user's stored/browser preference on the client.
-  const [lang, setLangState] = useState<Lang>(() => detectLang());
+  // Always start with "en" so server and client initial renders match,
+  // then sync the real preference from localStorage after hydration.
+  const [lang, setLangState] = useState<Lang>("en");
+
+  useEffect(() => {
+    setLangState(detectLang());
+  }, []);
 
   const setLang = useCallback((next: Lang) => {
     localStorage.setItem("lang", next);
