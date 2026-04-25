@@ -9,7 +9,7 @@ import {
   Trash2,
   RefreshCw,
   Copy,
-  LayoutDashboard,
+  SquareUser,
   Users,
   ShieldCheck,
   ChevronLeft,
@@ -287,16 +287,16 @@ export default function UsersPage() {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
-                      <Link href="/dashboard" target="_blank">
+                      <a href={`/api/admin/users/${user.id}/view-as`}>
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="View Dashboard"
+                          title="View as user"
                           className="h-8 w-8 text-slate-500 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/30"
                         >
-                          <LayoutDashboard className="h-3.5 w-3.5" />
+                          <SquareUser className="h-3.5 w-3.5" />
                         </Button>
-                      </Link>
+                      </a>
                       <Button
                         variant="ghost"
                         size="icon"
