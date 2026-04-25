@@ -8,6 +8,7 @@ import {
   Users2,
   Plus,
   Trash2,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,19 @@ interface GroupModelRow {
 interface AvailableModel {
   id: string;
   alias: string;
+}
+
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+}
+
+interface AllUser {
+  id: string;
+  name: string;
+  email: string;
 }
 
 function SectionCard({
@@ -75,21 +89,26 @@ export default function GroupDetailPage() {
   const [group, setGroup] = useState<Group | null>(null);
   const [groupModels, setGroupModels] = useState<GroupModelRow[]>([]);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [allUsers, setAllUsers] = useState<AllUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [remark, setRemark] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [editingQuota, setEditingQuota] = useState<string | null>(null);
   const [quotaForm, setQuotaForm] = useState<Record<string, string>>({});
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [groupRes, modelsRes, allModelsRes] = await Promise.all([
+      const [groupRes, modelsRes, allModelsRes, membersRes, allUsersRes] = await Promise.all([
         fetch(`/api/admin/groups/${groupId}`),
         fetch(`/api/admin/groups/${groupId}/models`),
         fetch("/api/admin/models"),
+        fetch(`/api/admin/groups/${groupId}/members`),
+        fetch("/api/admin/users?limit=1000"),
       ]);
       if (groupRes.ok) {
         const g = await groupRes.json();
@@ -99,6 +118,11 @@ export default function GroupDetailPage() {
       }
       if (modelsRes.ok) setGroupModels(await modelsRes.json());
       if (allModelsRes.ok) setAvailableModels(await allModelsRes.json());
+      if (membersRes.ok) setMembers(await membersRes.json());
+      if (allUsersRes.ok) {
+        const data = await allUsersRes.json();
+        setAllUsers(data.data ?? data);
+      }
     } finally {
       setLoading(false);
     }
@@ -157,6 +181,37 @@ export default function GroupDetailPage() {
     }
   };
 
+  const handleAddMember = async () => {
+    if (!selectedUserId) return;
+    const res = await fetch(`/api/admin/groups/${groupId}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: selectedUserId }),
+    });
+    if (res.ok) {
+      toast({ title: "User added to group" });
+      setSelectedUserId("");
+      fetchData();
+    } else {
+      const d = await res.json();
+      toast({ title: "Error", description: d.error, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveMember = async (userId: string, userName: string) => {
+    if (!confirm(`Remove "${userName}" from this group? They will be moved to the Default group.`)) return;
+    const res = await fetch(`/api/admin/groups/${groupId}/members/${userId}`, {
+      method: "DELETE",
+    });
+    if (res.ok || res.status === 204) {
+      toast({ title: "User removed from group" });
+      fetchData();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      toast({ title: "Error", description: d.error, variant: "destructive" });
+    }
+  };
+
   const handleStartEditQuota = (modelId: string, quota: GroupModelRow["quota"]) => {
     setEditingQuota(modelId);
     setQuotaForm({
@@ -193,6 +248,9 @@ export default function GroupDetailPage() {
 
   const authorizedModelIds = new Set(groupModels.map((gm) => gm.model.id));
   const unauthorizedModels = availableModels.filter((m) => !authorizedModelIds.has(m.id));
+
+  const memberIds = new Set(members.map((m) => m.id));
+  const nonMembers = allUsers.filter((u) => !memberIds.has(u.id));
 
   if (loading) {
     return (
@@ -274,6 +332,85 @@ export default function GroupDetailPage() {
             {saving ? "Saving…" : "Save Changes"}
           </Button>
         </div>
+      </SectionCard>
+
+      {/* Members */}
+      <SectionCard
+        title={`Members (${members.length})`}
+        icon={UserPlus}
+        action={
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 min-w-[180px]"
+            >
+              <option value="">Select user…</option>
+              {nonMembers.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.email})
+                </option>
+              ))}
+            </select>
+            <Button
+              size="sm"
+              onClick={handleAddMember}
+              disabled={!selectedUserId}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white border-0"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add
+            </Button>
+          </div>
+        }
+      >
+        {members.length === 0 ? (
+          <p className="text-sm text-slate-400 dark:text-slate-500">No members in this group</p>
+        ) : (
+          <div className="rounded-lg border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Name</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Email</th>
+                  <th className="text-left py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Status</th>
+                  <th className="text-right py-2.5 px-4 font-semibold text-slate-600 dark:text-slate-300">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m) => (
+                  <tr
+                    key={m.id}
+                    className="border-b border-slate-100 dark:border-slate-700/40 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-700/20 transition-colors"
+                  >
+                    <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">{m.name}</td>
+                    <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">{m.email}</td>
+                    <td className="py-2.5 px-4">
+                      <span className={m.isActive ? "text-green-600 dark:text-green-400" : "text-slate-400"}>
+                        {m.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4">
+                      <div className="flex justify-end">
+                        {!group.isDefault && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Remove from group"
+                            onClick={() => handleRemoveMember(m.id, m.name)}
+                            className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </SectionCard>
 
       {/* Model Access */}
