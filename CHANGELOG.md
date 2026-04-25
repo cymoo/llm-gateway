@@ -1,3 +1,8 @@
+## <small>0.1.1 (2026-04-25)</small>
+
+
+
+
 ## 0.1.0 (2026-04-25)
 
 * chore: add copilot instruction ([93bc8e1](https://github.com/cymoo/llm-gateway/commit/93bc8e1))
