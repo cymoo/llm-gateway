@@ -32,7 +32,8 @@ describe("handleProxy prompt preview", () => {
 
     let limitCallIndex = 0;
     const limitResults = [
-      [{ id: "user-1", isActive: true }],
+      [{ id: "user-1", isActive: true, groupId: "group-default" }],
+      [{ id: "group-default", isDefault: true }],
       [{ id: "model-1", alias: "gpt-test", backendUrl: "http://backend", backendModel: "gpt-backend" }],
       [{ userId: "user-1", modelId: "model-1" }],
     ];

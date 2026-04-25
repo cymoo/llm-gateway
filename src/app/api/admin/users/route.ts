@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, userModels, dailyUsage } from "@/lib/db/schema";
+import { users, groups, userModels, dailyUsage } from "@/lib/db/schema";
 import { eq, ilike, or, count, sql, and, inArray } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 import { generateApiKey } from "@/lib/utils/api-key";
@@ -109,10 +109,18 @@ export async function POST(req: NextRequest) {
 
   const apiKey = generateApiKey();
 
+  // Look up the Default group to assign to new users
+  const defaultGroupRows = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.isDefault, true))
+    .limit(1);
+  const defaultGroupId = defaultGroupRows[0]?.id ?? null;
+
   try {
     const [user] = await db
       .insert(users)
-      .values({ name, email, apiKey, remark, isActive: true, isAdmin: false })
+      .values({ name, email, apiKey, remark, isActive: true, isAdmin: false, groupId: defaultGroupId })
       .returning();
 
     return Response.json(user, { status: 201 });

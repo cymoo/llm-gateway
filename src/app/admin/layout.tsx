@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Users,
+  Users2,
   Cpu,
   BarChart3,
   LogOut,
@@ -17,6 +18,7 @@ import { ToastContextProvider } from "@/components/ui/use-toast";
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/groups", label: "Groups", icon: Users2 },
   { href: "/admin/models", label: "Models", icon: Cpu },
   { href: "/admin/usage", label: "Usage", icon: BarChart3 },
 ];

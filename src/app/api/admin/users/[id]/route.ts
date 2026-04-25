@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, groups } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import {
   getAdminUser,
   unauthorizedResponse,
   notFoundResponse,
+  badRequestResponse,
 } from "@/app/api/admin/middleware";
 import { validateAdminPassword } from "@/lib/utils/validators";
 
@@ -28,7 +29,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!admin) return unauthorizedResponse();
 
   const { id } = await params;
-  const { name, email, remark, isActive, isAdmin, password } = await req.json();
+  const { name, email, remark, isActive, isAdmin, password, groupId } = await req.json();
   const userRows = await db.select().from(users).where(eq(users.id, id)).limit(1);
 
   if (userRows.length === 0) return notFoundResponse("User not found");
@@ -60,6 +61,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (isActive !== undefined) updates.isActive = isActive;
   if (isAdmin !== undefined) updates.isAdmin = isAdmin;
   if (hasPassword) updates.passwordHash = await bcrypt.hash(password, 10);
+  if (groupId !== undefined) {
+    // Validate groupId exists
+    if (groupId !== null) {
+      const groupRows = await db
+        .select({ id: groups.id })
+        .from(groups)
+        .where(eq(groups.id, groupId))
+        .limit(1);
+      if (groupRows.length === 0) return badRequestResponse("Group not found");
+    }
+    updates.groupId = groupId;
+  }
   updates.updatedAt = new Date();
 
   try {

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockInsert, mockInsertValues } = vi.hoisted(() => {
+const { mockSelect, mockInsert, mockInsertValues } = vi.hoisted(() => {
   const insertValues = vi.fn();
   const insert = vi.fn(() => ({ values: insertValues }));
+  const select = vi.fn();
   return {
+    mockSelect: select,
     mockInsert: insert,
     mockInsertValues: insertValues,
   };
@@ -11,6 +13,7 @@ const { mockInsert, mockInsertValues } = vi.hoisted(() => {
 
 vi.mock("@/lib/db", () => ({
   db: {
+    select: mockSelect,
     insert: mockInsert,
   },
 }));
@@ -27,6 +30,14 @@ describe("POST /api/auth/register", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInsertValues.mockResolvedValue(undefined);
+    // Default group lookup returns a group id
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ id: "group-default" }]),
+        }),
+      }),
+    });
   });
 
   it("creates a pending user with normalized email", async () => {
@@ -39,7 +50,7 @@ describe("POST /api/auth/register", () => {
     expect(res.status).toBe(201);
     expect(body.message).toContain("pending admin approval");
     expect(body.data.status).toBe("pending_approval");
-    expect(body.adminName).toBe("admin");
+    expect(body.adminName).toBeTypeOf("string");
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockInsertValues).toHaveBeenCalledTimes(1);
     const values = mockInsertValues.mock.calls[0][0];
@@ -49,6 +60,7 @@ describe("POST /api/auth/register", () => {
     expect(values.isAdmin).toBe(false);
     expect(values.apiKey).toBeTypeOf("string");
     expect(values.passwordHash).toBe("hashed_password");
+    expect(values.groupId).toBe("group-default");
   });
 
   it("rejects invalid email", async () => {

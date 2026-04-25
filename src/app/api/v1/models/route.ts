@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, models, userModels } from "@/lib/db/schema";
+import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
 
@@ -30,12 +30,28 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Get authorized models for this user
-  const authorizedModels = await db
-    .select({ model: models })
-    .from(userModels)
-    .innerJoin(models, eq(userModels.modelId, models.id))
-    .where(and(eq(userModels.userId, user.id), eq(models.isActive, true)));
+  // Determine group membership
+  const groupRows = user.groupId
+    ? await db.select().from(groups).where(eq(groups.id, user.groupId)).limit(1)
+    : [];
+  const group = groupRows[0];
+  const isDefaultGroup = !group || group.isDefault;
+
+  let authorizedModels: Array<{ model: typeof models.$inferSelect }>;
+
+  if (isDefaultGroup) {
+    authorizedModels = await db
+      .select({ model: models })
+      .from(userModels)
+      .innerJoin(models, eq(userModels.modelId, models.id))
+      .where(and(eq(userModels.userId, user.id), eq(models.isActive, true)));
+  } else {
+    authorizedModels = await db
+      .select({ model: models })
+      .from(groupModels)
+      .innerJoin(models, eq(groupModels.modelId, models.id))
+      .where(and(eq(groupModels.groupId, group.id), eq(models.isActive, true)));
+  }
 
   const data = authorizedModels.map(({ model }) => ({
     id: model.alias,

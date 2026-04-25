@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { userModels, models, userModelQuotas, users, groups } from "@/lib/db/schema";
+import { groupModels, groupModelQuotas, models, groups } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getAdminUser,
@@ -9,35 +9,6 @@ import {
 } from "@/app/api/admin/middleware";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** Returns 409 if the user is in a non-default group (individual config is managed by group). */
-async function checkGroupGuard(userId: string): Promise<Response | null> {
-  const userRows = await db
-    .select({ groupId: users.groupId })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  if (userRows.length === 0) return notFoundResponse("User not found");
-
-  const { groupId } = userRows[0];
-  if (!groupId) return null;
-
-  const groupRows = await db
-    .select({ isDefault: groups.isDefault })
-    .from(groups)
-    .where(eq(groups.id, groupId))
-    .limit(1);
-
-  if (groupRows.length === 0) return null;
-  if (!groupRows[0].isDefault) {
-    return Response.json(
-      { error: "User belongs to a non-default group; configure model access at the group level" },
-      { status: 409 }
-    );
-  }
-  return null;
-}
 
 export async function GET(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);
@@ -48,19 +19,19 @@ export async function GET(req: NextRequest, { params }: Params) {
   const rows = await db
     .select({
       model: models,
-      quota: userModelQuotas,
-      createdAt: userModels.createdAt,
+      quota: groupModelQuotas,
+      createdAt: groupModels.createdAt,
     })
-    .from(userModels)
-    .innerJoin(models, eq(userModels.modelId, models.id))
+    .from(groupModels)
+    .innerJoin(models, eq(groupModels.modelId, models.id))
     .leftJoin(
-      userModelQuotas,
+      groupModelQuotas,
       and(
-        eq(userModelQuotas.userId, id),
-        eq(userModelQuotas.modelId, models.id)
+        eq(groupModelQuotas.groupId, id),
+        eq(groupModelQuotas.modelId, models.id)
       )
     )
-    .where(eq(userModels.userId, id));
+    .where(eq(groupModels.groupId, id));
 
   return Response.json(rows);
 }
@@ -71,11 +42,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  const guard = await checkGroupGuard(id);
-  if (guard) return guard;
+  // Verify group exists
+  const groupRows = await db
+    .select()
+    .from(groups)
+    .where(eq(groups.id, id))
+    .limit(1);
+  if (groupRows.length === 0) return notFoundResponse("Group not found");
 
   const { modelId } = await req.json();
-
   if (!modelId) {
     return Response.json({ error: "modelId is required" }, { status: 400 });
   }
@@ -86,15 +61,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     .from(models)
     .where(eq(models.id, modelId))
     .limit(1);
-
   if (modelRows.length === 0) return notFoundResponse("Model not found");
   const model = modelRows[0];
 
   // Add authorization
   try {
-    await db.insert(userModels).values({ userId: id, modelId });
+    await db.insert(groupModels).values({ groupId: id, modelId });
   } catch {
-    return Response.json({ error: "Model already authorized" }, { status: 409 });
+    return Response.json(
+      { error: "Model already authorized for this group" },
+      { status: 409 }
+    );
   }
 
   // Auto-inherit default quota template from model
@@ -107,9 +84,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   if (hasDefaults) {
     await db
-      .insert(userModelQuotas)
+      .insert(groupModelQuotas)
       .values({
-        userId: id,
+        groupId: id,
         modelId,
         maxTokensPerDay: model.defaultMaxTokensPerDay,
         maxRequestsPerDay: model.defaultMaxRequestsPerDay,

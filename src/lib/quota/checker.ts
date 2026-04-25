@@ -1,13 +1,18 @@
 import { db } from "@/lib/db";
-import { userModelQuotas, models, dailyUsage } from "@/lib/db/schema";
+import { userModelQuotas, groupModelQuotas, dailyUsage } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getRateLimiter } from "./rate-limiter";
 import { makeProxyError } from "@/lib/proxy/errors";
+
+export type QuotaSource =
+  | { type: "user" }
+  | { type: "group"; groupId: string };
 
 export interface QuotaContext {
   userId: string;
   modelId: string;
   modelAlias: string;
+  quotaSource: QuotaSource;
   defaultMaxTokensPerDay: number | null;
   defaultMaxRequestsPerDay: number | null;
   defaultMaxRequestsPerMin: number | null;
@@ -41,31 +46,60 @@ export async function checkQuota(
 ): Promise<Response | null> {
   const { userId, modelId } = ctx;
 
-  // Get user-specific quota (if exists)
-  const quotaRows = await db
-    .select()
-    .from(userModelQuotas)
-    .where(
-      and(
-        eq(userModelQuotas.userId, userId),
-        eq(userModelQuotas.modelId, modelId)
+  // Resolve quota override: group-based or per-user
+  let overrideMaxTokensPerDay: number | null | undefined;
+  let overrideMaxRequestsPerDay: number | null | undefined;
+  let overrideMaxRequestsPerMin: number | null | undefined;
+  let overrideAllowedTimeStart: string | null | undefined;
+  let overrideAllowedTimeEnd: string | null | undefined;
+
+  if (ctx.quotaSource.type === "group") {
+    const rows = await db
+      .select()
+      .from(groupModelQuotas)
+      .where(
+        and(
+          eq(groupModelQuotas.groupId, ctx.quotaSource.groupId),
+          eq(groupModelQuotas.modelId, modelId)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
+    const quota = rows[0];
+    overrideMaxTokensPerDay = quota?.maxTokensPerDay;
+    overrideMaxRequestsPerDay = quota?.maxRequestsPerDay;
+    overrideMaxRequestsPerMin = quota?.maxRequestsPerMin;
+    overrideAllowedTimeStart = quota?.allowedTimeStart;
+    overrideAllowedTimeEnd = quota?.allowedTimeEnd;
+  } else {
+    const rows = await db
+      .select()
+      .from(userModelQuotas)
+      .where(
+        and(
+          eq(userModelQuotas.userId, userId),
+          eq(userModelQuotas.modelId, modelId)
+        )
+      )
+      .limit(1);
+    const quota = rows[0];
+    overrideMaxTokensPerDay = quota?.maxTokensPerDay;
+    overrideMaxRequestsPerDay = quota?.maxRequestsPerDay;
+    overrideMaxRequestsPerMin = quota?.maxRequestsPerMin;
+    overrideAllowedTimeStart = quota?.allowedTimeStart;
+    overrideAllowedTimeEnd = quota?.allowedTimeEnd;
+  }
 
-  const quota = quotaRows[0];
-
-  // Resolve effective quota values (user-specific overrides model defaults)
+  // Effective quota = override ?? model default ?? null (unlimited)
   const maxTokensPerDay =
-    quota?.maxTokensPerDay ?? ctx.defaultMaxTokensPerDay ?? null;
+    overrideMaxTokensPerDay ?? ctx.defaultMaxTokensPerDay ?? null;
   const maxRequestsPerDay =
-    quota?.maxRequestsPerDay ?? ctx.defaultMaxRequestsPerDay ?? null;
+    overrideMaxRequestsPerDay ?? ctx.defaultMaxRequestsPerDay ?? null;
   const maxRequestsPerMin =
-    quota?.maxRequestsPerMin ?? ctx.defaultMaxRequestsPerMin ?? null;
+    overrideMaxRequestsPerMin ?? ctx.defaultMaxRequestsPerMin ?? null;
   const allowedTimeStart =
-    quota?.allowedTimeStart ?? ctx.defaultAllowedTimeStart ?? null;
+    overrideAllowedTimeStart ?? ctx.defaultAllowedTimeStart ?? null;
   const allowedTimeEnd =
-    quota?.allowedTimeEnd ?? ctx.defaultAllowedTimeEnd ?? null;
+    overrideAllowedTimeEnd ?? ctx.defaultAllowedTimeEnd ?? null;
 
   // 1. Check time window
   if (allowedTimeStart && allowedTimeEnd) {

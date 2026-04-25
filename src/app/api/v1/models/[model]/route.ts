@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, models, userModels } from "@/lib/db/schema";
+import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
 
@@ -52,16 +52,31 @@ export async function GET(
 
   const model = modelRows[0];
 
-  // Check authorization
-  const authRows = await db
-    .select()
-    .from(userModels)
-    .where(
-      and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
-    )
-    .limit(1);
+  // Determine group membership and check authorization
+  const groupRows = user.groupId
+    ? await db.select().from(groups).where(eq(groups.id, user.groupId)).limit(1)
+    : [];
+  const group = groupRows[0];
+  const isDefaultGroup = !group || group.isDefault;
 
-  if (authRows.length === 0) {
+  let authorized = false;
+  if (isDefaultGroup) {
+    const authRows = await db
+      .select()
+      .from(userModels)
+      .where(and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)))
+      .limit(1);
+    authorized = authRows.length > 0;
+  } else {
+    const authRows = await db
+      .select()
+      .from(groupModels)
+      .where(and(eq(groupModels.groupId, group.id), eq(groupModels.modelId, model.id)))
+      .limit(1);
+    authorized = authRows.length > 0;
+  }
+
+  if (!authorized) {
     return makeProxyError(
       `You are not authorized to use model '${modelAlias}'`,
       "permission_error",

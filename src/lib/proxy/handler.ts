@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, models, userModels } from "@/lib/db/schema";
+import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError, normalizeBackendError } from "./errors";
 import { checkQuota } from "@/lib/quota/checker";
@@ -58,6 +58,17 @@ export async function handleProxy(
       403
     );
   }
+
+  // Fetch user's group (skip if no groupId to avoid unnecessary query)
+  const group = user.groupId
+    ? (
+        await db
+          .select()
+          .from(groups)
+          .where(eq(groups.id, user.groupId))
+          .limit(1)
+      )[0]
+    : undefined;
 
   // 2. Parse request body
   let body: Record<string, unknown>;
@@ -120,15 +131,33 @@ export async function handleProxy(
   const model = modelRows[0];
 
   // 4. Authorize
-  const authRows = await db
-    .select()
-    .from(userModels)
-    .where(
-      and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
-    )
-    .limit(1);
+  const isDefaultGroup = !group || group.isDefault;
+  let authorized = false;
 
-  if (authRows.length === 0) {
+  if (isDefaultGroup) {
+    const authRows = await db
+      .select()
+      .from(userModels)
+      .where(
+        and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
+      )
+      .limit(1);
+    authorized = authRows.length > 0;
+  } else {
+    const authRows = await db
+      .select()
+      .from(groupModels)
+      .where(
+        and(
+          eq(groupModels.groupId, group.id),
+          eq(groupModels.modelId, model.id)
+        )
+      )
+      .limit(1);
+    authorized = authRows.length > 0;
+  }
+
+  if (!authorized) {
     return makeProxyError(
       `You are not authorized to use model '${modelAlias}'`,
       "permission_error",
@@ -142,6 +171,9 @@ export async function handleProxy(
     userId: user.id,
     modelId: model.id,
     modelAlias: model.alias,
+    quotaSource: isDefaultGroup
+      ? { type: "user" }
+      : { type: "group", groupId: group.id },
     defaultMaxTokensPerDay: model.defaultMaxTokensPerDay ?? null,
     defaultMaxRequestsPerDay: model.defaultMaxRequestsPerDay ?? null,
     defaultMaxRequestsPerMin: model.defaultMaxRequestsPerMin ?? null,

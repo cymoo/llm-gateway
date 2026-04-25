@@ -15,6 +15,7 @@ import {
   Bot,
   Shield,
   Code,
+  Users2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,10 @@ interface DashboardData {
     email: string;
     apiKey: string;
     isAdmin: boolean;
+  };
+  group: {
+    name: string;
+    isDefault: boolean;
   };
   today: {
     totalTokens: number;
@@ -317,6 +322,13 @@ for chunk in stream:
                 {data.user.isAdmin && (
                   <span className="inline-flex items-center gap-1 text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium">
                     <Shield className="h-3 w-3" /> Admin
+                  </span>
+                )}
+                {data.group && (
+                  <span className="inline-flex items-center gap-1 text-xs bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full font-medium">
+                    <Users2 className="h-3 w-3" />
+                    {data.group.name}
+                    {data.group.isDefault ? " (Default)" : ""}
                   </span>
                 )}
               </div>

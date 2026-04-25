@@ -15,6 +15,15 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+export const groups = pgTable("groups", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 100 }).unique().notNull(),
+  remark: varchar("remark", { length: 1000 }),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).default(sql`now()`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).default(sql`now()`),
+});
+
 export const users = pgTable(
   "users",
   {
@@ -26,6 +35,7 @@ export const users = pgTable(
     remark: varchar("remark", { length: 1000 }),
     isActive: boolean("is_active").default(true),
     isAdmin: boolean("is_admin").default(false),
+    groupId: uuid("group_id").references(() => groups.id),
     createdAt: timestamp("created_at", { withTimezone: true }).default(
       sql`now()`
     ),
@@ -36,6 +46,7 @@ export const users = pgTable(
   (table) => [
     index("idx_users_api_key").on(table.apiKey),
     index("idx_users_email").on(table.email),
+    index("idx_users_group_id").on(table.groupId),
   ]
 );
 
@@ -149,8 +160,54 @@ export const dailyUsage = pgTable(
   ]
 );
 
+export const groupModels = pgTable(
+  "group_models",
+  {
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    modelId: uuid("model_id")
+      .notNull()
+      .references(() => models.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).default(
+      sql`now()`
+    ),
+  },
+  (table) => [primaryKey({ columns: [table.groupId, table.modelId] })]
+);
+
+export const groupModelQuotas = pgTable(
+  "group_model_quotas",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    groupId: uuid("group_id")
+      .notNull()
+      .references(() => groups.id, { onDelete: "cascade" }),
+    modelId: uuid("model_id")
+      .notNull()
+      .references(() => models.id, { onDelete: "cascade" }),
+    maxTokensPerDay: bigint("max_tokens_per_day", { mode: "number" }),
+    maxRequestsPerDay: integer("max_requests_per_day"),
+    maxRequestsPerMin: integer("max_requests_per_min"),
+    allowedTimeStart: time("allowed_time_start"),
+    allowedTimeEnd: time("allowed_time_end"),
+    createdAt: timestamp("created_at", { withTimezone: true }).default(
+      sql`now()`
+    ),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).default(
+      sql`now()`
+    ),
+  },
+  (table) => [unique().on(table.groupId, table.modelId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Group = typeof groups.$inferSelect;
+export type NewGroup = typeof groups.$inferInsert;
+export type GroupModel = typeof groupModels.$inferSelect;
+export type GroupModelQuota = typeof groupModelQuotas.$inferSelect;
+export type NewGroupModelQuota = typeof groupModelQuotas.$inferInsert;
 export type Model = typeof models.$inferSelect;
 export type NewModel = typeof models.$inferInsert;
 export type UserModel = typeof userModels.$inferSelect;

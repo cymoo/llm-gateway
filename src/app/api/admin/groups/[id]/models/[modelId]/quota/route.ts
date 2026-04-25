@@ -1,56 +1,23 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { userModelQuotas, users, groups } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { groupModelQuotas } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import {
   getAdminUser,
   unauthorizedResponse,
-  notFoundResponse,
 } from "@/app/api/admin/middleware";
 
 type Params = { params: Promise<{ id: string; modelId: string }> };
-
-/** Returns 409 if the user is in a non-default group. */
-async function checkGroupGuard(userId: string): Promise<Response | null> {
-  const userRows = await db
-    .select({ groupId: users.groupId })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  if (userRows.length === 0) return notFoundResponse("User not found");
-
-  const { groupId } = userRows[0];
-  if (!groupId) return null;
-
-  const groupRows = await db
-    .select({ isDefault: groups.isDefault })
-    .from(groups)
-    .where(eq(groups.id, groupId))
-    .limit(1);
-
-  if (groupRows.length === 0) return null;
-  if (!groupRows[0].isDefault) {
-    return Response.json(
-      { error: "User belongs to a non-default group; configure quotas at the group level" },
-      { status: 409 }
-    );
-  }
-  return null;
-}
 
 export async function PUT(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);
   if (!admin) return unauthorizedResponse();
 
   const { id, modelId } = await params;
-
-  const guard = await checkGroupGuard(id);
-  if (guard) return guard;
   const body = await req.json();
 
   const quota = {
-    userId: id,
+    groupId: id,
     modelId,
     maxTokensPerDay: body.maxTokensPerDay ?? null,
     maxRequestsPerDay: body.maxRequestsPerDay ?? null,
@@ -61,10 +28,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   };
 
   const [result] = await db
-    .insert(userModelQuotas)
+    .insert(groupModelQuotas)
     .values(quota)
     .onConflictDoUpdate({
-      target: [userModelQuotas.userId, userModelQuotas.modelId],
+      target: [groupModelQuotas.groupId, groupModelQuotas.modelId],
       set: {
         maxTokensPerDay: quota.maxTokensPerDay,
         maxRequestsPerDay: quota.maxRequestsPerDay,
@@ -77,4 +44,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .returning();
 
   return Response.json(result);
+}
+
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const admin = await getAdminUser(req);
+  if (!admin) return unauthorizedResponse();
+
+  const { id, modelId } = await params;
+
+  await db
+    .delete(groupModelQuotas)
+    .where(
+      and(
+        eq(groupModelQuotas.groupId, id),
+        eq(groupModelQuotas.modelId, modelId)
+      )
+    );
+
+  return Response.json({ success: true });
 }

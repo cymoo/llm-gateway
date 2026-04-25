@@ -13,6 +13,7 @@ import {
   UserCog,
   KeyRound,
   ShieldCheck,
+  Users2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,13 @@ interface UserData {
   apiKey: string;
   isActive: boolean;
   isAdmin: boolean;
+  groupId: string | null;
+}
+
+interface Group {
+  id: string;
+  name: string;
+  isDefault: boolean;
 }
 
 interface AuthorizedModel {
@@ -95,6 +103,7 @@ export default function UserDetailPage() {
   const userId = params.id as string;
 
   const [user, setUser] = useState<UserData | null>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [authModels, setAuthModels] = useState<AuthorizedModel[]>([]);
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,10 +122,11 @@ export default function UserDetailPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [userRes, authRes, modelsRes] = await Promise.all([
+      const [userRes, authRes, modelsRes, groupsRes] = await Promise.all([
         fetch(`/api/admin/users/${userId}`),
         fetch(`/api/admin/users/${userId}/models`),
         fetch("/api/admin/models"),
+        fetch("/api/admin/groups"),
       ]);
       if (userRes.ok) {
         const userData = await userRes.json();
@@ -128,6 +138,7 @@ export default function UserDetailPage() {
         const all = await modelsRes.json();
         setAvailableModels(all);
       }
+      if (groupsRes.ok) setGroups(await groupsRes.json());
     } finally {
       setLoading(false);
     }
@@ -168,6 +179,7 @@ export default function UserDetailPage() {
           remark: user.remark,
           isActive: user.isActive,
           isAdmin: user.isAdmin,
+          groupId: user.groupId,
           password: user.isAdmin && !initialIsAdmin ? password : undefined,
         }),
       });
@@ -322,6 +334,9 @@ export default function UserDetailPage() {
     (m) => !authorizedModelIds.has(m.id)
   );
 
+  const currentGroup = groups.find((g) => g.id === user?.groupId);
+  const isInDefaultGroup = !currentGroup || currentGroup.isDefault;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -400,6 +415,40 @@ export default function UserDetailPage() {
               onChange={(e) => setUser({ ...user, remark: e.target.value })}
               placeholder="Optional remark"
             />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Users2 className="h-3.5 w-3.5 text-violet-500" />
+              Group
+            </Label>
+            <Select
+              value={user.groupId || ""}
+              onValueChange={(v) => setUser({ ...user, groupId: v || null })}
+            >
+              <SelectTrigger className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-blue-500">
+                <SelectValue placeholder="Select group…" />
+              </SelectTrigger>
+              <SelectContent>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.name}
+                    {g.isDefault ? " (Default)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!isInDefaultGroup && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                This user&apos;s model access is managed by group{" "}
+                <Link
+                  href={`/admin/groups/${currentGroup?.id}`}
+                  className="underline hover:text-amber-700"
+                >
+                  {currentGroup?.name}
+                </Link>
+                . Individual model config is ignored.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
@@ -553,36 +602,50 @@ export default function UserDetailPage() {
 
       {/* Authorized Models */}
       <SectionCard
-        title="Authorized Models"
+        title={isInDefaultGroup ? "Authorized Models" : "Models (via Group)"}
         action={
-          <div className="flex items-center gap-2">
-            <Select
-              value={selectedModelId}
-              onValueChange={setSelectedModelId}
-            >
-              <SelectTrigger className="w-48 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                <SelectValue placeholder="Select model…" />
-              </SelectTrigger>
-              <SelectContent>
-                {unauthorizedModels.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.alias}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              onClick={handleAddModel}
-              disabled={!selectedModelId}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Authorize
-            </Button>
-          </div>
+          isInDefaultGroup ? (
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedModelId}
+                onValueChange={setSelectedModelId}
+              >
+                <SelectTrigger className="w-48 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                  <SelectValue placeholder="Select model…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unauthorizedModels.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.alias}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleAddModel}
+                disabled={!selectedModelId}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Authorize
+              </Button>
+            </div>
+          ) : (
+            <Link href={`/admin/groups/${currentGroup?.id}`}>
+              <Button variant="outline" size="sm" className="h-7 text-xs border-slate-200 dark:border-slate-700">
+                <Users2 className="h-3.5 w-3.5 mr-1" />
+                Edit in Group
+              </Button>
+            </Link>
+          )
         }
       >
+        {!isInDefaultGroup && (
+          <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
+            Model access is inherited from group <strong>{currentGroup?.name}</strong>. Shown below for reference only.
+          </p>
+        )}
         {authModels.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">
             No models authorized yet
@@ -619,7 +682,7 @@ export default function UserDetailPage() {
                       <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
                         {am.model.alias}
                       </td>
-                      {editingQuota === am.model.id ? (
+                      {editingQuota === am.model.id && isInDefaultGroup ? (
                         <>
                           <td className="py-2.5 px-4">
                             <Input
@@ -726,29 +789,33 @@ export default function UserDetailPage() {
                           </td>
                           <td className="py-2.5 px-4">
                             <div className="flex gap-1 justify-end">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  handleStartEditQuota(am.model.id, am.quota)
-                                }
-                                className="h-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                              >
-                                Edit Quota
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  handleRevokeModel(
-                                    am.model.id,
-                                    am.model.alias
-                                  )
-                                }
-                                className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
+                              {isInDefaultGroup && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleStartEditQuota(am.model.id, am.quota)
+                                    }
+                                    className="h-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                                  >
+                                    Edit Quota
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      handleRevokeModel(
+                                        am.model.id,
+                                        am.model.alias
+                                      )
+                                    }
+                                    className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </>

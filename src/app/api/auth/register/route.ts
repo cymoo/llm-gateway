@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, groups } from "@/lib/db/schema";
 import { generateApiKey } from "@/lib/utils/api-key";
 import { validateEmail, validateAdminPassword } from "@/lib/utils/validators";
+import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
@@ -37,6 +38,14 @@ export async function POST(req: NextRequest) {
   const apiKey = generateApiKey();
   const passwordHash = await bcrypt.hash(password, 10);
 
+  // Look up the Default group to assign to new users
+  const defaultGroupRows = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.isDefault, true))
+    .limit(1);
+  const defaultGroupId = defaultGroupRows[0]?.id ?? null;
+
   try {
     await db.insert(users).values({
       name: normalizedName,
@@ -45,6 +54,7 @@ export async function POST(req: NextRequest) {
       passwordHash,
       isActive: false,
       isAdmin: false,
+      groupId: defaultGroupId,
     });
   } catch (err: unknown) {
     if (err instanceof Error && err.message.toLowerCase().includes("unique")) {
