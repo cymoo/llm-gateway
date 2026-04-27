@@ -27,7 +27,19 @@ export async function GET(
 
   // Pass the token via URL param; middleware will set the cookie and redirect
   // to a clean URL. This avoids the unreliable Set-Cookie on redirect responses.
-  const redirectUrl = new URL("/dashboard", req.nextUrl.origin);
+  //
+  // In production (behind a reverse proxy), req.nextUrl.origin reflects the
+  // internal address (e.g. localhost:3000). Read forwarded headers instead to
+  // build the correct public-facing redirect URL.
+  const host =
+    req.headers.get("x-forwarded-host") ||
+    req.headers.get("host") ||
+    "localhost:3000";
+  const proto =
+    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+    (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+
+  const redirectUrl = new URL("/dashboard", `${proto}://${host}`);
   redirectUrl.searchParams.set("_vt", token);
   return NextResponse.redirect(redirectUrl);
 }
