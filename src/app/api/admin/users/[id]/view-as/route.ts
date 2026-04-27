@@ -25,10 +25,9 @@ export async function GET(
     isAdmin: user.isAdmin ?? false,
   });
 
-  const response = NextResponse.redirect(new URL("/dashboard", req.url));
-  response.headers.set(
-    "Set-Cookie",
-    `user_token=${token}; HttpOnly; Path=/; SameSite=Lax; Max-Age=86400`
-  );
-  return response;
+  // Pass the token via URL param; middleware will set the cookie and redirect
+  // to a clean URL. This avoids the unreliable Set-Cookie on redirect responses.
+  const redirectUrl = new URL("/dashboard", req.nextUrl.origin);
+  redirectUrl.searchParams.set("_vt", token);
+  return NextResponse.redirect(redirectUrl);
 }
