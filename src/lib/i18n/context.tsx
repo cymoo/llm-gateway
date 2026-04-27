@@ -4,8 +4,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
+  useSyncExternalStore,
 } from "react";
 import en, { type Translations } from "./locales/en";
 import zh from "./locales/zh";
@@ -13,11 +12,25 @@ import zh from "./locales/zh";
 type Lang = "en" | "zh";
 
 const locales: Record<Lang, Translations> = { en, zh };
+const LANG_CHANGE_EVENT = "llm-gateway-language-change";
 
 function detectLang(): Lang {
   const stored = localStorage.getItem("lang");
   if (stored === "en" || stored === "zh") return stored;
   if (navigator.language.toLowerCase().startsWith("zh")) return "zh";
+  return "en";
+}
+
+function subscribe(onStoreChange: () => void): () => void {
+  window.addEventListener("storage", onStoreChange);
+  window.addEventListener(LANG_CHANGE_EVENT, onStoreChange);
+  return () => {
+    window.removeEventListener("storage", onStoreChange);
+    window.removeEventListener(LANG_CHANGE_EVENT, onStoreChange);
+  };
+}
+
+function getServerLang(): Lang {
   return "en";
 }
 
@@ -63,17 +76,11 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  // Always start with "en" so server and client initial renders match,
-  // then sync the real preference from localStorage after hydration.
-  const [lang, setLangState] = useState<Lang>("en");
-
-  useEffect(() => {
-    setLangState(detectLang());
-  }, []);
+  const lang = useSyncExternalStore(subscribe, detectLang, getServerLang);
 
   const setLang = useCallback((next: Lang) => {
     localStorage.setItem("lang", next);
-    setLangState(next);
+    window.dispatchEvent(new Event(LANG_CHANGE_EVENT));
   }, []);
 
   const t = useCallback(

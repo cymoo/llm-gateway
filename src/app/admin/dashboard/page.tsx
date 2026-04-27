@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Users,
   Cpu,
@@ -109,11 +109,16 @@ export default function DashboardPage() {
   const abortRef = useRef<AbortController | null>(null);
   const { t } = useLanguage();
 
+  const handleTrendDaysChange = useCallback((days: TrendDays) => {
+    if (days === trendDays) return;
+    setLoading(true);
+    setTrendDays(days);
+  }, [trendDays]);
+
   useEffect(() => {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
-    setLoading(true);
     fetch(`/api/admin/usage/overview?days=${trendDays}`, {
       signal: controller.signal,
     })
@@ -216,7 +221,7 @@ export default function DashboardPage() {
             {([7, 14, 30] as TrendDays[]).map((d) => (
               <button
                 key={d}
-                onClick={() => setTrendDays(d)}
+                onClick={() => handleTrendDaysChange(d)}
                 className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
                   trendDays === d
                     ? "bg-blue-600 text-white"

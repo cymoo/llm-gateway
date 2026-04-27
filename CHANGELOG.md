@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-27
+
+### 🐛 Bug Fixes
+
+- **View as User flow** — fixed the admin "View as User" entry so it reliably lands on the real dashboard URL even behind a reverse proxy. The handoff now uses a temporary URL token that middleware converts into the user session cookie before redirecting to a clean `/dashboard` URL, avoiding broken links and unreliable cookie-setting on redirects.
+- **Admin user navigation** — returning from `/admin/users/[id]` now preserves the current list page and search keywords. The edit page receives the original list URL through a `back` query parameter, so the back button returns admins to the exact filtered context they came from instead of resetting to the first page.
+
 ## [0.1.2] - 2026-04-25
 
 ### 🐛 Bug Fixes
