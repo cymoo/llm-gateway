@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -98,11 +98,13 @@ function SectionCard({
   );
 }
 
-export default function UserDetailPage() {
+function UserDetailContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { t } = useLanguage();
   const userId = params.id as string;
+  const backUrl = searchParams.get("back") ?? "/admin/users";
 
   const [user, setUser] = useState<UserData | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -354,7 +356,7 @@ export default function UserDetailPage() {
     <div className="space-y-6 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link href="/admin/users">
+        <Link href={backUrl}>
           <Button
             variant="ghost"
             size="icon"
@@ -821,5 +823,13 @@ export default function UserDetailPage() {
         )}
       </SectionCard>
     </div>
+  );
+}
+
+export default function UserDetailPage() {
+  return (
+    <Suspense>
+      <UserDetailContent />
+    </Suspense>
   );
 }

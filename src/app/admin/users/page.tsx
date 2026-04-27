@@ -302,7 +302,7 @@ function UsersContent() {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-0.5">
-                      <Link href={`/admin/users/${user.id}`}>
+                      <Link href={`/admin/users/${user.id}?back=${encodeURIComponent(buildUrl(page, search))}`}>
                         <Button
                           variant="ghost"
                           size="icon"
