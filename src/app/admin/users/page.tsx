@@ -312,7 +312,7 @@ function UsersContent() {
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       </Link>
-                      <a href={`/api/admin/users/${user.id}/view-as`}>
+                      <a href={`/api/admin/users/${user.id}/view-as`} target="_blank" rel="noopener noreferrer">
                         <Button
                           variant="ghost"
                           size="icon"
