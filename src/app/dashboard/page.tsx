@@ -78,6 +78,7 @@ interface DashboardData {
   models: ModelInfo[];
   modelStats: ModelStat[];
   baseUrl: string;
+  anthropicBaseUrl: string;
 }
 
 const PIE_COLORS = [
@@ -97,7 +98,7 @@ function formatTooltipNumber(value: unknown): string {
   return Number.isFinite(num) ? formatNum(num) : "N/A";
 }
 
-function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) {
+function MaskedApiKey({ apiKey, baseUrl, anthropicBaseUrl }: { apiKey: string; baseUrl: string; anthropicBaseUrl: string }) {
   const { t } = useLanguage();
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
@@ -125,6 +126,25 @@ function MaskedApiKey({ apiKey, baseUrl }: { apiKey: string; baseUrl: string }) 
           title={t("userDashboard.copyBaseUrl")}
         >
           {copied === "url" ? (
+            <Check className="h-3.5 w-3.5 text-green-600" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-[hsl(var(--muted-foreground))]">
+          {t("userDashboard.anthropicBaseUrl")}
+        </span>
+        <code className="text-sm bg-[hsl(var(--muted))] px-2 py-1 rounded font-mono">
+          {anthropicBaseUrl}
+        </code>
+        <button
+          onClick={() => handleCopy(anthropicBaseUrl, "anthropic-url")}
+          className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          title={t("userDashboard.copyBaseUrl")}
+        >
+          {copied === "anthropic-url" ? (
             <Check className="h-3.5 w-3.5 text-green-600" />
           ) : (
             <Copy className="h-3.5 w-3.5" />
@@ -287,6 +307,50 @@ stream = client.chat.completions.create(
 for chunk in stream:
     if chunk.choices[0].delta.content is not None:
         print(chunk.choices[0].delta.content, end="")`;
+
+  const anthropicNonStreamCode = `import os
+from anthropic import Anthropic
+
+os.environ['no_proxy'] = '${noProxy}'
+
+client = Anthropic(
+    base_url="${data.anthropicBaseUrl}",
+    api_key="${data.user.apiKey}",
+    auth_token="${data.user.apiKey}",
+)
+
+message = client.messages.create(
+    model="${firstModel}",
+    max_tokens=1000,
+    system="You are a helpful assistant.",
+    messages=[
+        {"role": "user", "content": "Hello!"}
+    ],
+)
+
+print(message.content[0].text)`;
+
+  const anthropicStreamCode = `import os
+from anthropic import Anthropic
+
+os.environ['no_proxy'] = '${noProxy}'
+
+client = Anthropic(
+    base_url="${data.anthropicBaseUrl}",
+    api_key="${data.user.apiKey}",
+    auth_token="${data.user.apiKey}",
+)
+
+with client.messages.stream(
+    model="${firstModel}",
+    max_tokens=1000,
+    system="You are a helpful assistant.",
+    messages=[
+        {"role": "user", "content": "Hello!"}
+    ],
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="")`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/30">
@@ -577,7 +641,7 @@ for chunk in stream:
             {t("userDashboard.apiAccess")}
           </h2>
           <div className="rounded-xl border border-slate-200/60 bg-white/70 backdrop-blur-sm p-6 dark:border-slate-700/60 dark:bg-slate-800/50 space-y-5">
-            <MaskedApiKey apiKey={data.user.apiKey} baseUrl={data.baseUrl} />
+            <MaskedApiKey apiKey={data.user.apiKey} baseUrl={data.baseUrl} anthropicBaseUrl={data.anthropicBaseUrl} />
             {modelAliases.length > 0 && (
               <div>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{t("userDashboard.authorizedModels")}</p>
@@ -608,6 +672,8 @@ for chunk in stream:
               <TabsList className="bg-slate-100/80 dark:bg-slate-700/50">
                 <TabsTrigger value="non-stream">{t("userDashboard.nonStreaming")}</TabsTrigger>
                 <TabsTrigger value="stream">{t("userDashboard.streaming")}</TabsTrigger>
+                <TabsTrigger value="anthropic-non-stream">{t("userDashboard.anthropicNonStreaming")}</TabsTrigger>
+                <TabsTrigger value="anthropic-stream">{t("userDashboard.anthropicStreaming")}</TabsTrigger>
               </TabsList>
               <TabsContent value="non-stream" className="mt-4">
                 <CodeBlock
@@ -619,6 +685,18 @@ for chunk in stream:
                 <CodeBlock
                   label="Python (openai library) — Streaming"
                   code={streamCode}
+                />
+              </TabsContent>
+              <TabsContent value="anthropic-non-stream" className="mt-4">
+                <CodeBlock
+                  label="Python (anthropic library) — Non-Streaming"
+                  code={anthropicNonStreamCode}
+                />
+              </TabsContent>
+              <TabsContent value="anthropic-stream" className="mt-4">
+                <CodeBlock
+                  label="Python (anthropic library) — Streaming"
+                  code={anthropicStreamCode}
                 />
               </TabsContent>
             </Tabs>

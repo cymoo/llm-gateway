@@ -259,6 +259,7 @@ export async function GET(req: NextRequest) {
     req.headers.get("x-forwarded-proto") ||
     (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
   const baseUrl = `${proto}://${host}/api/v1`;
+  const anthropicBaseUrl = `${proto}://${host}/api/anthropic`;
 
   return Response.json({
     user: {
@@ -278,5 +279,6 @@ export async function GET(req: NextRequest) {
     models: modelsWithQuotas,
     modelStats: modelStatsMapped,
     baseUrl,
+    anthropicBaseUrl,
   });
 }
