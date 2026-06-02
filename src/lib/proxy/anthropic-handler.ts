@@ -145,6 +145,10 @@ export async function handleAnthropicProxy(
     .limit(1);
 
   if (modelRows.length === 0) {
+    console.error(
+      "[anthropic-proxy] model not found:",
+      modelAlias
+    );
     return makeAnthropicError(
       `Model '${modelAlias}' not found`,
       "not_found_error",
@@ -265,6 +269,11 @@ export async function handleAnthropicProxy(
 
     if (!backendResponse.ok) {
       const backendErrorText = await backendResponse.text();
+      console.error(
+        "[anthropic-proxy] backend error:",
+        backendResponse.status,
+        backendErrorText.slice(0, 500)
+      );
       const normalizedError = normalizeAnthropicBackendError(
         backendErrorText,
         backendResponse.status
