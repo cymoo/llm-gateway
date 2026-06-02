@@ -237,8 +237,15 @@ export async function handleAnthropicProxy(
   // Rewrite model field to backend_model
   const backendBody = { ...body, model: model.backendModel };
 
-  const backendUrlBase = model.backendUrl.replace(/\/$/, "");
+  let backendUrlBase = model.backendUrl.replace(/\/$/, "");
+  // Avoid double /v1: if backend already ends with /v1 and path starts with v1/,
+  // strip /v1 from backend so we don't get /v1/v1/messages
+  if (backendUrlBase.endsWith("/v1") && remainingPath.startsWith("v1/")) {
+    backendUrlBase = backendUrlBase.replace(/\/v1$/, "");
+  }
   const backendUrl = `${backendUrlBase}/${remainingPath}`;
+
+  console.log("[anthropic-proxy] forwarding to:", backendUrl, "model:", model.backendModel);
 
   const headers = buildForwardHeaders(apiKey, model.backendApiKey ?? undefined);
   forwardAnthropicHeaders(req, headers);
