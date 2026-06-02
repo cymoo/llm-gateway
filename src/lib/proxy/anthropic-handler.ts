@@ -17,6 +17,8 @@ export async function handleAnthropicProxy(
   req: NextRequest,
   remainingPath: string
 ): Promise<Response> {
+  console.log("[anthropic-proxy] incoming:", req.method, req.nextUrl.pathname, "remainingPath:", remainingPath);
+
   // 1. Authenticate — Anthropic SDK uses x-api-key header
   let apiKey = req.headers.get("x-api-key")?.trim();
   if (!apiKey) {
@@ -249,6 +251,7 @@ export async function handleAnthropicProxy(
   }
   const backendUrl = `${backendUrlBase}/${remainingPath}`;
 
+  console.log("[anthropic-proxy] alias:", modelAlias, "backendModel:", model.backendModel, "backendUrl:", model.backendUrl);
   console.log("[anthropic-proxy] forwarding to:", backendUrl, "model:", model.backendModel);
 
   const headers = buildForwardHeaders(apiKey, model.backendApiKey ?? undefined);
