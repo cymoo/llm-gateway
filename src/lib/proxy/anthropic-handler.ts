@@ -17,9 +17,6 @@ export async function handleAnthropicProxy(
   req: NextRequest,
   remainingPath: string
 ): Promise<Response> {
-  console.log("[anthropic-proxy] >>> incoming:", req.method, req.nextUrl.pathname, "remainingPath:", remainingPath);
-  console.log("[anthropic-proxy] >>> x-api-key present:", !!req.headers.get("x-api-key"), "auth present:", !!req.headers.get("authorization"));
-
   // 1. Authenticate — Anthropic SDK uses x-api-key header
   let apiKey = req.headers.get("x-api-key")?.trim();
   if (!apiKey) {
@@ -87,7 +84,6 @@ export async function handleAnthropicProxy(
 
   const modelAlias = body.model as string;
   if (!modelAlias) {
-    console.error("[anthropic-proxy] missing model in body, keys:", Object.keys(body));
     return makeAnthropicError(
       "Missing model field in request body",
       "not_found_error",
@@ -149,10 +145,6 @@ export async function handleAnthropicProxy(
     .limit(1);
 
   if (modelRows.length === 0) {
-    console.error(
-      "[anthropic-proxy] model not found:",
-      modelAlias
-    );
     return makeAnthropicError(
       `Model '${modelAlias}' not found`,
       "not_found_error",
@@ -254,9 +246,6 @@ export async function handleAnthropicProxy(
   }
   const backendUrl = `${backendUrlBase}/${remainingPath}`;
 
-  console.log("[anthropic-proxy] alias:", modelAlias, "backendModel:", model.backendModel, "backendUrl:", model.backendUrl);
-  console.log("[anthropic-proxy] forwarding to:", backendUrl, "model:", model.backendModel);
-
   const headers = buildForwardHeaders(apiKey, model.backendApiKey ?? undefined);
   forwardAnthropicHeaders(req, headers);
 
@@ -275,11 +264,6 @@ export async function handleAnthropicProxy(
 
     if (!backendResponse.ok) {
       const backendErrorText = await backendResponse.text();
-      console.error(
-        "[anthropic-proxy] backend error:",
-        backendResponse.status,
-        backendErrorText.slice(0, 500)
-      );
       const normalizedError = normalizeAnthropicBackendError(
         backendErrorText,
         backendResponse.status

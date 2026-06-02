@@ -316,7 +316,6 @@ os.environ['no_proxy'] = '${noProxy}'
 client = Anthropic(
     base_url="${data.anthropicBaseUrl}",
     api_key="${data.user.apiKey}",
-    auth_token="${data.user.apiKey}",
 )
 
 message = client.messages.create(
@@ -338,7 +337,6 @@ os.environ['no_proxy'] = '${noProxy}'
 client = Anthropic(
     base_url="${data.anthropicBaseUrl}",
     api_key="${data.user.apiKey}",
-    auth_token="${data.user.apiKey}",
 )
 
 with client.messages.stream(
