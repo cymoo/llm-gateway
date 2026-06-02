@@ -244,12 +244,17 @@ export async function handleAnthropicProxy(
   const backendBody = { ...body, model: model.backendModel };
 
   let backendUrlBase = model.backendUrl.replace(/\/$/, "");
-  // Avoid double /v1: if backend already ends with /v1 and path starts with v1/,
-  // strip /v1 from backend so we don't get /v1/v1/messages
+  let effectivePath = remainingPath;
+  // The Anthropic SDK always sends /v1/messages, but vllm's Anthropic-compatible
+  // interface may not include the /v1 prefix. If the backend URL already ends
+  // with /v1, strip it from the URL and also strip v1/ from the SDK's path,
+  // so the final URL uses the correct route: {base}/messages instead of
+  // {base}/v1/messages or {base}/v1/v1/messages.
   if (backendUrlBase.endsWith("/v1") && remainingPath.startsWith("v1/")) {
     backendUrlBase = backendUrlBase.replace(/\/v1$/, "");
+    effectivePath = remainingPath.slice(3); // remove "v1/"
   }
-  const backendUrl = `${backendUrlBase}/${remainingPath}`;
+  const backendUrl = `${backendUrlBase}/${effectivePath}`;
 
   console.log("[anthropic-proxy] alias:", modelAlias, "backendModel:", model.backendModel, "backendUrl:", model.backendUrl);
   console.log("[anthropic-proxy] forwarding to:", backendUrl, "model:", model.backendModel);
