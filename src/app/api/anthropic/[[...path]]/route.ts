@@ -3,7 +3,7 @@ import { handleAnthropicProxy } from "@/lib/proxy/anthropic-handler";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ path: string[] }> }
+  { params }: { params: Promise<{ path?: string[] }> }
 ) {
   const { path } = await params;
   const remainingPath = path?.length ? path.join("/") : "v1/messages";
