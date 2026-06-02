@@ -17,7 +17,8 @@ export async function handleAnthropicProxy(
   req: NextRequest,
   remainingPath: string
 ): Promise<Response> {
-  console.log("[anthropic-proxy] incoming:", req.method, req.nextUrl.pathname, "remainingPath:", remainingPath);
+  console.log("[anthropic-proxy] >>> incoming:", req.method, req.nextUrl.pathname, "remainingPath:", remainingPath);
+  console.log("[anthropic-proxy] >>> x-api-key present:", !!req.headers.get("x-api-key"), "auth present:", !!req.headers.get("authorization"));
 
   // 1. Authenticate — Anthropic SDK uses x-api-key header
   let apiKey = req.headers.get("x-api-key")?.trim();
@@ -86,6 +87,7 @@ export async function handleAnthropicProxy(
 
   const modelAlias = body.model as string;
   if (!modelAlias) {
+    console.error("[anthropic-proxy] missing model in body, keys:", Object.keys(body));
     return makeAnthropicError(
       "Missing model field in request body",
       "not_found_error",
@@ -244,17 +246,13 @@ export async function handleAnthropicProxy(
   const backendBody = { ...body, model: model.backendModel };
 
   let backendUrlBase = model.backendUrl.replace(/\/$/, "");
-  let effectivePath = remainingPath;
-  // The Anthropic SDK always sends /v1/messages, but vllm's Anthropic-compatible
-  // interface may not include the /v1 prefix. If the backend URL already ends
-  // with /v1, strip it from the URL and also strip v1/ from the SDK's path,
-  // so the final URL uses the correct route: {base}/messages instead of
-  // {base}/v1/messages or {base}/v1/v1/messages.
+  // The model's backendUrl typically includes /v1 (same as OpenAI base URL).
+  // The Anthropic SDK sends /v1/messages (remainingPath = "v1/messages").
+  // To avoid double /v1: strip it from backendUrl. Final: {base}/v1/messages.
   if (backendUrlBase.endsWith("/v1") && remainingPath.startsWith("v1/")) {
     backendUrlBase = backendUrlBase.replace(/\/v1$/, "");
-    effectivePath = remainingPath.slice(3); // remove "v1/"
   }
-  const backendUrl = `${backendUrlBase}/${effectivePath}`;
+  const backendUrl = `${backendUrlBase}/${remainingPath}`;
 
   console.log("[anthropic-proxy] alias:", modelAlias, "backendModel:", model.backendModel, "backendUrl:", model.backendUrl);
   console.log("[anthropic-proxy] forwarding to:", backendUrl, "model:", model.backendModel);
