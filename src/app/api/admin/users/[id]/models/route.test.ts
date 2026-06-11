@@ -35,52 +35,33 @@ describe("POST /api/admin/users/[id]/models", () => {
     mockGetAdminUser.mockResolvedValue({ userId: "admin-1" });
   });
 
-  it("returns 409 when user is in a non-default group", async () => {
-    let callIndex = 0;
+  it("allows adding model even when user is in a non-default group", async () => {
+    // The group guard has been removed: personal models are always manageable.
     mockSelect.mockImplementation(() => ({
       from: () => ({
         where: () => ({
-          limit: () => {
-            if (callIndex++ === 0) {
-              return Promise.resolve([{ groupId: "group-eng" }]); // user has non-default group
-            }
-            return Promise.resolve([{ isDefault: false }]); // group is NOT default
-          },
+          limit: () => Promise.resolve([]), // model not found → 404, but NOT 409
         }),
       }),
     }));
 
     const req = { json: async () => ({ modelId: "model-1" }) };
     const res = await POST(req as never, params);
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.error).toContain("non-default group");
+    expect(res.status).not.toBe(409);
+    expect(res.status).not.toBe(401);
   });
 
-  it("allows adding model for Default group member", async () => {
-    let callIndex = 0;
+  it("allows adding model for any group membership", async () => {
     mockSelect.mockImplementation(() => ({
       from: () => ({
         where: () => ({
-          limit: () => {
-            if (callIndex++ === 0) {
-              return Promise.resolve([{ groupId: "group-default" }]);
-            }
-            // group.isDefault lookup
-            return Promise.resolve([{ isDefault: true }]);
-          },
-        }),
-      }),
-      innerJoin: () => ({
-        leftJoin: () => ({
-          where: () => Promise.resolve([]),
+          limit: () => Promise.resolve([]), // model not found → 404, but NOT 409
         }),
       }),
     }));
 
     const req = { json: async () => ({ modelId: "model-1" }) };
     const res = await POST(req as never, params);
-    // Will 404 (model not found) because we don't mock the model lookup, but NOT 409
     expect(res.status).not.toBe(409);
     expect(res.status).not.toBe(401);
   });

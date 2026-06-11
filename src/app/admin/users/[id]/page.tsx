@@ -596,48 +596,47 @@ function UserDetailContent() {
 
       {/* Authorized Models */}
       <SectionCard
-        title={isInDefaultGroup ? t("users.authorizedModels") : t("users.modelsViaGroup")}
+        title={t("users.authorizedModels")}
         action={
-          isInDefaultGroup ? (
-            <div className="flex items-center gap-2">
-              <Select
-                value={selectedModelId}
-                onValueChange={setSelectedModelId}
-              >
-                <SelectTrigger className="w-48 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-                  <SelectValue placeholder={t("users.selectModel")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {unauthorizedModels.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.alias}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                onClick={handleAddModel}
-                disabled={!selectedModelId}
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                {t("common.authorize")}
-              </Button>
-            </div>
-          ) : (
-            <Link href={`/admin/groups/${currentGroup?.id}`}>
-              <Button variant="outline" size="sm" className="h-7 text-xs border-slate-200 dark:border-slate-700">
-                <Users2 className="h-3.5 w-3.5 mr-1" />
-                {t("users.editInGroup")}
-              </Button>
-            </Link>
-          )
+          <div className="flex items-center gap-2">
+            {!isInDefaultGroup && (
+              <Link href={`/admin/groups/${currentGroup?.id}`}>
+                <Button variant="outline" size="sm" className="h-7 text-xs border-slate-200 dark:border-slate-700">
+                  <Users2 className="h-3.5 w-3.5 mr-1" />
+                  {t("users.editInGroup")}
+                </Button>
+              </Link>
+            )}
+            <Select
+              value={selectedModelId}
+              onValueChange={setSelectedModelId}
+            >
+              <SelectTrigger className="w-48 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <SelectValue placeholder={t("users.selectModel")} />
+              </SelectTrigger>
+              <SelectContent>
+                {unauthorizedModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.alias}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={handleAddModel}
+              disabled={!selectedModelId}
+              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0"
+            >
+              <Plus className="h-4 w-4 mr-1.5" />
+              {t("common.authorize")}
+            </Button>
+          </div>
         }
       >
         {!isInDefaultGroup && (
           <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-            {t("users.modelInheritedNote", { group: currentGroup?.name ?? "" })}
+            {t("users.modelMergedNote", { group: currentGroup?.name ?? "" })}
           </p>
         )}
         {authModels.length === 0 ? (
@@ -676,7 +675,7 @@ function UserDetailContent() {
                       <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
                         {am.model.alias}
                       </td>
-                      {editingQuota === am.model.id && isInDefaultGroup ? (
+                      {editingQuota === am.model.id ? (
                         <>
                           <td className="py-2.5 px-4">
                             <Input
@@ -783,33 +782,29 @@ function UserDetailContent() {
                           </td>
                           <td className="py-2.5 px-4">
                             <div className="flex gap-1 justify-end">
-                              {isInDefaultGroup && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleStartEditQuota(am.model.id, am.quota)
-                                    }
-                                    className="h-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
-                                  >
-                                    Edit Quota
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      handleRevokeModel(
-                                        am.model.id,
-                                        am.model.alias
-                                      )
-                                    }
-                                    className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleStartEditQuota(am.model.id, am.quota)
+                                }
+                                className="h-7 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                              >
+                                Edit Quota
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() =>
+                                  handleRevokeModel(
+                                    am.model.id,
+                                    am.model.alias
+                                  )
+                                }
+                                className="h-7 w-7 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </div>
                           </td>
                         </>

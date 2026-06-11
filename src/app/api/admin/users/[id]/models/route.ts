@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { userModels, models, userModelQuotas, users, groups } from "@/lib/db/schema";
+import { userModels, models, userModelQuotas } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getAdminUser,
@@ -9,35 +9,6 @@ import {
 } from "@/app/api/admin/middleware";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** Returns 409 if the user is in a non-default group (individual config is managed by group). */
-async function checkGroupGuard(userId: string): Promise<Response | null> {
-  const userRows = await db
-    .select({ groupId: users.groupId })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-
-  if (userRows.length === 0) return notFoundResponse("User not found");
-
-  const { groupId } = userRows[0];
-  if (!groupId) return null;
-
-  const groupRows = await db
-    .select({ isDefault: groups.isDefault })
-    .from(groups)
-    .where(eq(groups.id, groupId))
-    .limit(1);
-
-  if (groupRows.length === 0) return null;
-  if (!groupRows[0].isDefault) {
-    return Response.json(
-      { error: "User belongs to a non-default group; configure model access at the group level" },
-      { status: 409 }
-    );
-  }
-  return null;
-}
 
 export async function GET(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);
@@ -70,9 +41,6 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!admin) return unauthorizedResponse();
 
   const { id } = await params;
-
-  const guard = await checkGroupGuard(id);
-  if (guard) return guard;
 
   const { modelId } = await req.json();
 

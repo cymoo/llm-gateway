@@ -139,9 +139,11 @@ const en = {
     enterNewPwd: "Enter new password",
     selectGroup: "Select group…",
     groupManagedNote:
-      "This user's model access is managed by group {group}. Individual model config is ignored.",
+      "User belongs to group {group}. Group models take priority; personal models below are also active.",
     modelInheritedNote:
       "Model access is inherited from group {group}. Shown below for reference only.",
+    modelMergedNote:
+      "User belongs to group {group}. Group models take priority for quota; personal models listed here are also active.",
     editInGroup: "Edit in Group",
     noModelsAuthorized: "No models authorized yet",
     selectModel: "Select model…",

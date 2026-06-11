@@ -79,8 +79,8 @@ function UserUsageContent() {
       .finally(() => setLoading(false));
   }, [userId, startDate, endDate]);
 
-  const totalRequests = usageByModel.reduce((s, m) => s + m.requestCount, 0);
-  const totalTokens = usageByModel.reduce((s, m) => s + m.totalTokens, 0);
+  const totalRequests = usageByModel.reduce((s, m) => s + Number(m.requestCount), 0);
+  const totalTokens = usageByModel.reduce((s, m) => s + Number(m.totalTokens), 0);
 
   if (loading) {
     return (

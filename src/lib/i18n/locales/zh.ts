@@ -137,9 +137,11 @@ const zh: Translations = {
     enterNewPwd: "输入新密码",
     selectGroup: "选择分组…",
     groupManagedNote:
-      "该用户的模型访问权限由分组 {group} 管理，个人模型配置将被忽略。",
+      "该用户属于分组 {group}，分组模型优先生效；个人模型权限同样有效。",
     modelInheritedNote:
       "模型访问权限继承自分组 {group}，以下仅供参考。",
+    modelMergedNote:
+      "该用户属于分组 {group}（分组模型配额优先）。下方个人授权模型与分组模型合并生效。",
     editInGroup: "在分组中编辑",
     noModelsAuthorized: "暂无已授权模型",
     selectModel: "选择模型…",
