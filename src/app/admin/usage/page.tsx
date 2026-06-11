@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { BarChart3, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,9 +98,18 @@ function getDefaultRange() {
   };
 }
 
-export default function UsagePage() {
-  const [tab, setTab] = useState("by-user");
-  const [dateRange, setDateRange] = useState(getDefaultRange());
+function UsageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [tab, setTab] = useState(() => searchParams.get("tab") || "by-user");
+  const [dateRange, setDateRange] = useState(() => {
+    const def = getDefaultRange();
+    return {
+      startDate: searchParams.get("startDate") || def.startDate,
+      endDate: searchParams.get("endDate") || def.endDate,
+    };
+  });
   const [userStats, setUserStats] = useState<UserStat[]>([]);
   const [modelStats, setModelStats] = useState<ModelStat[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
@@ -115,6 +126,27 @@ export default function UsagePage() {
   const logsLimit = 50;
 
   const { t } = useLanguage();
+
+  const handleTabChange = (v: string) => {
+    setTab(v);
+    setLogsPage(1);
+    const qs = new URLSearchParams({
+      tab: v,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
+    });
+    router.replace(`/admin/usage?${qs}`, { scroll: false });
+  };
+
+  const userDetailUrl = (userId: string) => {
+    const qs = new URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+    return `/admin/usage/user/${userId}?${qs}`;
+  };
+
+  const modelDetailUrl = (modelId: string) => {
+    const qs = new URLSearchParams({ startDate: dateRange.startDate, endDate: dateRange.endDate });
+    return `/admin/usage/model/${modelId}?${qs}`;
+  };
 
   const exportLogsCsv = async () => {
     const { startDate, endDate } = dateRange;
@@ -236,7 +268,7 @@ export default function UsagePage() {
         </CardContent>
       </Card>
 
-      <Tabs value={tab} onValueChange={(v) => { setTab(v); setLogsPage(1); }}>
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="by-user">{t("usage.byUser")}</TabsTrigger>
           <TabsTrigger value="by-model">{t("usage.byModel")}</TabsTrigger>
@@ -308,7 +340,14 @@ export default function UsagePage() {
                 ) : (
                   userStats.map((s) => (
                     <TableRow key={s.userId}>
-                      <TableCell className="font-medium">{s.userName}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={userDetailUrl(s.userId)}
+                          className="hover:text-[hsl(var(--primary))] hover:underline"
+                        >
+                          {s.userName}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-[hsl(var(--muted-foreground))]">{s.userEmail}</TableCell>
                       <TableCell className="text-right">{formatNum(s.requestCount)}</TableCell>
                       <TableCell className="text-right">{formatNum(s.totalTokens)}</TableCell>
@@ -384,7 +423,14 @@ export default function UsagePage() {
                 ) : (
                   modelStats.map((s) => (
                     <TableRow key={s.modelId}>
-                      <TableCell className="font-medium font-mono">{s.modelAlias}</TableCell>
+                      <TableCell className="font-medium font-mono">
+                        <Link
+                          href={modelDetailUrl(s.modelId)}
+                          className="hover:text-[hsl(var(--primary))] hover:underline"
+                        >
+                          {s.modelAlias}
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-right">{formatNum(s.requestCount)}</TableCell>
                       <TableCell className="text-right">{formatNum(s.totalTokens)}</TableCell>
                     </TableRow>
@@ -584,5 +630,13 @@ export default function UsagePage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function UsagePage() {
+  return (
+    <Suspense>
+      <UsageContent />
+    </Suspense>
   );
 }

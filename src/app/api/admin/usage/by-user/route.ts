@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     .innerJoin(users, eq(dailyUsage.userId, users.id))
     .where(whereClause)
     .groupBy(dailyUsage.userId, users.name, users.email)
-    .orderBy(sql`sum(${dailyUsage.totalTokens}) desc`);
+    .orderBy(sql`sum(${dailyUsage.requestCount}) desc`);
 
   return Response.json(result);
 }

@@ -21,6 +21,8 @@ const zh: Translations = {
     refresh: "刷新",
     previous: "上一页",
     next: "下一页",
+    firstPage: "首页",
+    lastPage: "末页",
     saving: "保存中...",
     creating: "创建中...",
     unlimited: "不限",

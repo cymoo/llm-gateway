@@ -19,6 +19,8 @@ const en = {
     refresh: "Refresh",
     previous: "Previous",
     next: "Next",
+    firstPage: "First",
+    lastPage: "Last",
     saving: "Saving...",
     creating: "Creating...",
     unlimited: "Unlimited",

@@ -130,9 +130,10 @@ export async function handleProxy(
 
   const model = modelRows[0];
 
-  // 4. Authorize
+  // 4. Authorize — group models take precedence; user's own models are also valid
   const isDefaultGroup = !group || group.isDefault;
   let authorized = false;
+  let quotaSource: import("@/lib/quota/checker").QuotaSource = { type: "user" };
 
   if (isDefaultGroup) {
     const authRows = await db
@@ -143,8 +144,10 @@ export async function handleProxy(
       )
       .limit(1);
     authorized = authRows.length > 0;
+    quotaSource = { type: "user" };
   } else {
-    const authRows = await db
+    // Check group first (higher priority)
+    const groupAuthRows = await db
       .select()
       .from(groupModels)
       .where(
@@ -154,7 +157,22 @@ export async function handleProxy(
         )
       )
       .limit(1);
-    authorized = authRows.length > 0;
+
+    if (groupAuthRows.length > 0) {
+      authorized = true;
+      quotaSource = { type: "group", groupId: group.id };
+    } else {
+      // Fall back to user's own model list
+      const userAuthRows = await db
+        .select()
+        .from(userModels)
+        .where(
+          and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
+        )
+        .limit(1);
+      authorized = userAuthRows.length > 0;
+      quotaSource = { type: "user" };
+    }
   }
 
   if (!authorized) {
@@ -171,9 +189,7 @@ export async function handleProxy(
     userId: user.id,
     modelId: model.id,
     modelAlias: model.alias,
-    quotaSource: isDefaultGroup
-      ? { type: "user" }
-      : { type: "group", groupId: group.id },
+    quotaSource,
     defaultMaxTokensPerDay: model.defaultMaxTokensPerDay ?? null,
     defaultMaxRequestsPerDay: model.defaultMaxRequestsPerDay ?? null,
     defaultMaxRequestsPerMin: model.defaultMaxRequestsPerMin ?? null,

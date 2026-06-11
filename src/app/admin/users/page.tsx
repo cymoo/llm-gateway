@@ -360,6 +360,15 @@ function UsersContent() {
               variant="outline"
               size="sm"
               disabled={page === 1}
+              onClick={() => handlePageChange(1)}
+              className="h-8 px-2 text-xs border-slate-200 dark:border-slate-700"
+            >
+              {t("common.firstPage")}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 1}
               onClick={() => handlePageChange(page - 1)}
               className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
@@ -376,6 +385,15 @@ function UsersContent() {
               className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700"
             >
               <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === totalPages}
+              onClick={() => handlePageChange(totalPages)}
+              className="h-8 px-2 text-xs border-slate-200 dark:border-slate-700"
+            >
+              {t("common.lastPage")}
             </Button>
           </div>
         </div>
