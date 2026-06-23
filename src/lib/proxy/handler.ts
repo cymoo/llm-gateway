@@ -203,8 +203,21 @@ export async function handleProxy(
   const isStream = body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
-  // Rewrite model field to backend_model
-  const backendBody = { ...body, model: model.backendModel };
+  // Rewrite model field to backend_model.
+  // For streaming requests, inject stream_options.include_usage so the backend
+  // emits a final usage chunk; otherwise streamed requests record 0 tokens.
+  const backendBody = {
+    ...body,
+    model: model.backendModel,
+    ...(isStream
+      ? {
+          stream_options: {
+            ...(body.stream_options as Record<string, unknown> | undefined),
+            include_usage: true,
+          },
+        }
+      : {}),
+  };
 
   const backendUrl = `${model.backendUrl.replace(/\/$/, "")}/${
     requestType === "chat.completions" ? "chat/completions" : "completions"
