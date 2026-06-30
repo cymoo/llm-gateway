@@ -81,7 +81,9 @@ export async function GET(req: NextRequest) {
   const group = groupRows[0];
   const isDefaultGroup = !group || group.isDefault;
 
-  // Fetch accessible models based on group membership
+  // Fetch accessible models: the union of the group's models (for a non-default
+  // group) and the user's own authorized models. Group membership takes
+  // precedence on overlap, matching proxy authorization (see lib/proxy/handler.ts).
   type ModelRow = {
     modelId: string;
     alias: string;
@@ -91,45 +93,52 @@ export async function GET(req: NextRequest) {
     defaultMaxRequestsPerMin: number | null;
     defaultAllowedTimeStart: string | null;
     defaultAllowedTimeEnd: string | null;
+    source: "group" | "user";
   };
 
-  let authorizedModels: ModelRow[];
+  const modelColumns = {
+    modelId: models.id,
+    alias: models.alias,
+    isActive: models.isActive,
+    defaultMaxTokensPerDay: models.defaultMaxTokensPerDay,
+    defaultMaxRequestsPerDay: models.defaultMaxRequestsPerDay,
+    defaultMaxRequestsPerMin: models.defaultMaxRequestsPerMin,
+    defaultAllowedTimeStart: models.defaultAllowedTimeStart,
+    defaultAllowedTimeEnd: models.defaultAllowedTimeEnd,
+  };
 
-  if (isDefaultGroup) {
-    authorizedModels = await db
-      .select({
-        modelId: models.id,
-        alias: models.alias,
-        isActive: models.isActive,
-        defaultMaxTokensPerDay: models.defaultMaxTokensPerDay,
-        defaultMaxRequestsPerDay: models.defaultMaxRequestsPerDay,
-        defaultMaxRequestsPerMin: models.defaultMaxRequestsPerMin,
-        defaultAllowedTimeStart: models.defaultAllowedTimeStart,
-        defaultAllowedTimeEnd: models.defaultAllowedTimeEnd,
-      })
+  type ModelColumnRow = Omit<ModelRow, "source">;
+
+  const [groupModelRows, userModelRows] = await Promise.all([
+    !isDefaultGroup && group
+      ? db
+          .select(modelColumns)
+          .from(groupModels)
+          .innerJoin(models, eq(groupModels.modelId, models.id))
+          .where(eq(groupModels.groupId, group.id))
+      : Promise.resolve<ModelColumnRow[]>([]),
+    db
+      .select(modelColumns)
       .from(userModels)
       .innerJoin(models, eq(userModels.modelId, models.id))
-      .where(eq(userModels.userId, userId));
-  } else {
-    authorizedModels = await db
-      .select({
-        modelId: models.id,
-        alias: models.alias,
-        isActive: models.isActive,
-        defaultMaxTokensPerDay: models.defaultMaxTokensPerDay,
-        defaultMaxRequestsPerDay: models.defaultMaxRequestsPerDay,
-        defaultMaxRequestsPerMin: models.defaultMaxRequestsPerMin,
-        defaultAllowedTimeStart: models.defaultAllowedTimeStart,
-        defaultAllowedTimeEnd: models.defaultAllowedTimeEnd,
-      })
-      .from(groupModels)
-      .innerJoin(models, eq(groupModels.modelId, models.id))
-      .where(eq(groupModels.groupId, group.id));
+      .where(eq(userModels.userId, userId)),
+  ]);
+
+  const modelMap = new Map<string, ModelRow>();
+  for (const m of groupModelRows) {
+    modelMap.set(m.modelId, { ...m, source: "group" });
   }
+  for (const m of userModelRows) {
+    if (!modelMap.has(m.modelId)) {
+      modelMap.set(m.modelId, { ...m, source: "user" });
+    }
+  }
+  const authorizedModels = Array.from(modelMap.values());
 
   const modelIds = authorizedModels.map((m) => m.modelId);
 
-  // Fetch quota overrides based on group membership
+  // Fetch quota overrides from both sources; each model uses the override that
+  // matches the source it was authorized through (group quotas win on overlap).
   type QuotaRow = {
     modelId: string | null;
     maxTokensPerDay: number | null;
@@ -139,11 +148,30 @@ export async function GET(req: NextRequest) {
     allowedTimeEnd: string | null;
   };
 
-  let quotaOverrides: QuotaRow[] = [];
+  let groupQuotaMap = new Map<string | null, QuotaRow>();
+  let userQuotaMap = new Map<string | null, QuotaRow>();
 
   if (modelIds.length > 0) {
-    if (isDefaultGroup) {
-      quotaOverrides = await db
+    const [groupQuotas, userQuotas] = await Promise.all([
+      !isDefaultGroup && group
+        ? db
+            .select({
+              modelId: groupModelQuotas.modelId,
+              maxTokensPerDay: groupModelQuotas.maxTokensPerDay,
+              maxRequestsPerDay: groupModelQuotas.maxRequestsPerDay,
+              maxRequestsPerMin: groupModelQuotas.maxRequestsPerMin,
+              allowedTimeStart: groupModelQuotas.allowedTimeStart,
+              allowedTimeEnd: groupModelQuotas.allowedTimeEnd,
+            })
+            .from(groupModelQuotas)
+            .where(
+              and(
+                eq(groupModelQuotas.groupId, group.id),
+                inArray(groupModelQuotas.modelId, modelIds)
+              )
+            )
+        : Promise.resolve<QuotaRow[]>([]),
+      db
         .select({
           modelId: userModelQuotas.modelId,
           maxTokensPerDay: userModelQuotas.maxTokensPerDay,
@@ -158,28 +186,12 @@ export async function GET(req: NextRequest) {
             eq(userModelQuotas.userId, userId),
             inArray(userModelQuotas.modelId, modelIds)
           )
-        );
-    } else {
-      quotaOverrides = await db
-        .select({
-          modelId: groupModelQuotas.modelId,
-          maxTokensPerDay: groupModelQuotas.maxTokensPerDay,
-          maxRequestsPerDay: groupModelQuotas.maxRequestsPerDay,
-          maxRequestsPerMin: groupModelQuotas.maxRequestsPerMin,
-          allowedTimeStart: groupModelQuotas.allowedTimeStart,
-          allowedTimeEnd: groupModelQuotas.allowedTimeEnd,
-        })
-        .from(groupModelQuotas)
-        .where(
-          and(
-            eq(groupModelQuotas.groupId, group.id),
-            inArray(groupModelQuotas.modelId, modelIds)
-          )
-        );
-    }
-  }
+        ),
+    ]);
 
-  const quotaMap = new Map(quotaOverrides.map((q) => [q.modelId, q]));
+    groupQuotaMap = new Map(groupQuotas.map((q) => [q.modelId, q]));
+    userQuotaMap = new Map(userQuotas.map((q) => [q.modelId, q]));
+  }
 
   // Fetch today's per-model usage
   const todayModelUsage =
@@ -232,7 +244,10 @@ export async function GET(req: NextRequest) {
     .filter((s) => s.totalTokens > 0 || s.requestCount > 0);
 
   const modelsWithQuotas = authorizedModels.map((m) => {
-    const override = quotaMap.get(m.modelId);
+    const override =
+      m.source === "group"
+        ? groupQuotaMap.get(m.modelId)
+        : userQuotaMap.get(m.modelId);
     const usage = usageMap.get(m.modelId);
     return {
       alias: m.alias,

@@ -37,23 +37,33 @@ export async function GET(req: NextRequest) {
   const group = groupRows[0];
   const isDefaultGroup = !group || group.isDefault;
 
-  let authorizedModels: Array<{ model: typeof models.$inferSelect }>;
+  // Accessible models are the union of the group's models (for a non-default
+  // group) and the user's own authorized models, matching proxy authorization.
+  type ModelSelectRow = { model: typeof models.$inferSelect };
 
-  if (isDefaultGroup) {
-    authorizedModels = await db
+  const [groupModelRows, userModelRows] = await Promise.all([
+    !isDefaultGroup && group
+      ? db
+          .select({ model: models })
+          .from(groupModels)
+          .innerJoin(models, eq(groupModels.modelId, models.id))
+          .where(and(eq(groupModels.groupId, group.id), eq(models.isActive, true)))
+      : Promise.resolve<ModelSelectRow[]>([]),
+    db
       .select({ model: models })
       .from(userModels)
       .innerJoin(models, eq(userModels.modelId, models.id))
-      .where(and(eq(userModels.userId, user.id), eq(models.isActive, true)));
-  } else {
-    authorizedModels = await db
-      .select({ model: models })
-      .from(groupModels)
-      .innerJoin(models, eq(groupModels.modelId, models.id))
-      .where(and(eq(groupModels.groupId, group.id), eq(models.isActive, true)));
-  }
+      .where(and(eq(userModels.userId, user.id), eq(models.isActive, true))),
+  ]);
 
-  const data = authorizedModels.map(({ model }) => ({
+  const modelMap = new Map<string, typeof models.$inferSelect>();
+  for (const { model } of groupModelRows) modelMap.set(model.id, model);
+  for (const { model } of userModelRows) {
+    if (!modelMap.has(model.id)) modelMap.set(model.id, model);
+  }
+  const authorizedModels = Array.from(modelMap.values());
+
+  const data = authorizedModels.map((model) => ({
     id: model.alias,
     object: "model",
     created: Math.floor(new Date(model.createdAt!).getTime() / 1000),

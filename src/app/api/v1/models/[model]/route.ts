@@ -59,21 +59,24 @@ export async function GET(
   const group = groupRows[0];
   const isDefaultGroup = !group || group.isDefault;
 
+  // Authorized if the model is in the user's group (non-default group) or in
+  // the user's own model list, matching proxy authorization.
   let authorized = false;
-  if (isDefaultGroup) {
-    const authRows = await db
-      .select()
-      .from(userModels)
-      .where(and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)))
-      .limit(1);
-    authorized = authRows.length > 0;
-  } else {
-    const authRows = await db
+  if (!isDefaultGroup && group) {
+    const groupAuthRows = await db
       .select()
       .from(groupModels)
       .where(and(eq(groupModels.groupId, group.id), eq(groupModels.modelId, model.id)))
       .limit(1);
-    authorized = authRows.length > 0;
+    authorized = groupAuthRows.length > 0;
+  }
+  if (!authorized) {
+    const userAuthRows = await db
+      .select()
+      .from(userModels)
+      .where(and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)))
+      .limit(1);
+    authorized = userAuthRows.length > 0;
   }
 
   if (!authorized) {
