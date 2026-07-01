@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { redactSecrets, diff } from "./recorder";
+import { redactSecrets, diff, sanitizeDiff } from "./recorder";
 
 describe("redactSecrets", () => {
   it("redacts secret keys and drops bookkeeping keys", () => {
@@ -70,5 +70,24 @@ describe("diff", () => {
       before: {},
       after: {},
     });
+  });
+});
+
+describe("sanitizeDiff", () => {
+  it("redacts secrets a caller forgot to redact (both sides)", () => {
+    expect(
+      sanitizeDiff({
+        before: { apiKey: "old", name: "A" },
+        after: { apiKey: "new", name: "B" },
+      })
+    ).toEqual({
+      before: { apiKey: "[REDACTED]", name: "A" },
+      after: { apiKey: "[REDACTED]", name: "B" },
+    });
+  });
+
+  it("returns null for nullish input", () => {
+    expect(sanitizeDiff(null)).toBeNull();
+    expect(sanitizeDiff(undefined)).toBeNull();
   });
 });

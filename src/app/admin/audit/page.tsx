@@ -334,7 +334,15 @@ export default function AuditPage() {
                 <TableRow
                   key={log.id}
                   className="cursor-pointer"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelected(log)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelected(log);
+                    }
+                  }}
                   title={t("audit.viewDetails")}
                 >
                   <TableCell className="text-xs text-[hsl(var(--muted-foreground))]">

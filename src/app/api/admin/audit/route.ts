@@ -6,7 +6,9 @@ import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 
 function escapeCsvValue(value: unknown): string {
   const text = value == null ? "" : String(value);
-  const protectedText = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  // Guard against formula injection, including values with leading whitespace
+  // (e.g. "  =1+1") that spreadsheet apps still evaluate.
+  const protectedText = /^[=+\-@]/.test(text.trimStart()) ? `'${text}` : text;
   return `"${protectedText.replace(/"/g, '""')}"`;
 }
 
