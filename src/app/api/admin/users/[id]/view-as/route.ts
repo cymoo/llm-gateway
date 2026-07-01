@@ -4,6 +4,7 @@ import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { signJWT } from "@/lib/auth/jwt";
 import { getAdminUser, unauthorizedResponse, notFoundResponse } from "@/app/api/admin/middleware";
+import { recordAudit } from "@/lib/audit/recorder";
 
 export async function GET(
   req: NextRequest,
@@ -38,6 +39,16 @@ export async function GET(
   const proto =
     req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
     (/^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? "http" : "https");
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.view_as",
+    resourceType: "user",
+    resourceId: user.id,
+    resourceLabel: user.email,
+    req,
+  });
 
   const redirectUrl = new URL("/dashboard", `${proto}://${host}`);
   redirectUrl.searchParams.set("_vt", token);

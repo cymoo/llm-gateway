@@ -7,6 +7,7 @@ import {
   unauthorizedResponse,
   notFoundResponse,
 } from "@/app/api/admin/middleware";
+import { recordAudit } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,5 +24,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     .returning();
 
   if (!updated) return notFoundResponse("User not found");
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.approve",
+    resourceType: "user",
+    resourceId: updated.id,
+    resourceLabel: updated.email,
+    changes: { after: { isActive: true } },
+    req,
+  });
+
   return Response.json({ success: true });
 }

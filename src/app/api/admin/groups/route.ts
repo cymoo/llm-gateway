@@ -7,6 +7,7 @@ import {
   unauthorizedResponse,
   badRequestResponse,
 } from "@/app/api/admin/middleware";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 export async function GET(req: NextRequest) {
   const admin = await getAdminUser(req);
@@ -45,6 +46,17 @@ export async function POST(req: NextRequest) {
       .insert(groups)
       .values({ name: name.trim(), remark, isDefault: false })
       .returning();
+
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "group.create",
+      resourceType: "group",
+      resourceId: group.id,
+      resourceLabel: group.name,
+      changes: diff(null, group),
+      req,
+    });
 
     return Response.json(group, { status: 201 });
   } catch (err: unknown) {

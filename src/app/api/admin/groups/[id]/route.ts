@@ -8,6 +8,7 @@ import {
   notFoundResponse,
   badRequestResponse,
 } from "@/app/api/admin/middleware";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -61,6 +62,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
       .where(eq(groups.id, id))
       .returning();
 
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "group.update",
+      resourceType: "group",
+      resourceId: updated.id,
+      resourceLabel: updated.name,
+      changes: diff(group, updated),
+      req,
+    });
+
     return Response.json(updated);
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("unique")) {
@@ -100,6 +112,18 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   }
 
   await db.delete(groups).where(eq(groups.id, id));
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "group.delete",
+    resourceType: "group",
+    resourceId: group.id,
+    resourceLabel: group.name,
+    changes: diff(group, null),
+    metadata: { reassignedMembersToGroupId: defaultGroupId ?? null },
+    req,
+  });
 
   return new Response(null, { status: 204 });
 }

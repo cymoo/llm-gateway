@@ -8,6 +8,7 @@ import {
   notFoundResponse,
 } from "@/app/api/admin/middleware";
 import { generateApiKey } from "@/lib/utils/api-key";
+import { recordAudit } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -25,5 +26,18 @@ export async function POST(req: NextRequest, { params }: Params) {
     .returning();
 
   if (!updated) return notFoundResponse("User not found");
+
+  // Never store the key itself; just record that it was rotated.
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.regenerate_key",
+    resourceType: "user",
+    resourceId: updated.id,
+    resourceLabel: updated.email,
+    changes: { after: { apiKey: "[REDACTED]" } },
+    req,
+  });
+
   return Response.json({ apiKey: updated.apiKey });
 }

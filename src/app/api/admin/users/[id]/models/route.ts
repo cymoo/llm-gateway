@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { userModels, models, userModelQuotas } from "@/lib/db/schema";
+import { userModels, models, userModelQuotas, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
   getAdminUser,
   unauthorizedResponse,
   notFoundResponse,
 } from "@/app/api/admin/middleware";
+import { recordAudit } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -87,6 +88,24 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
       .onConflictDoNothing();
   }
+
+  const [targetUser] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.grant_model",
+    resourceType: "user",
+    resourceId: id,
+    resourceLabel: targetUser?.email ?? null,
+    changes: { after: { model: model.alias } },
+    metadata: { modelId, modelAlias: model.alias },
+    req,
+  });
 
   return Response.json({ success: true }, { status: 201 });
 }

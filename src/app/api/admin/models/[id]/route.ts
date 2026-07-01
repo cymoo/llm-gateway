@@ -8,6 +8,7 @@ import {
   notFoundResponse,
 } from "@/app/api/admin/middleware";
 import { validateModelAlias, validateUrl } from "@/lib/utils/validators";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -57,6 +58,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
   }
 
+  const [beforeModel] = await db
+    .select()
+    .from(models)
+    .where(eq(models.id, id))
+    .limit(1);
+
   try {
     const [updated] = await db
       .update(models)
@@ -65,6 +72,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
       .returning();
 
     if (!updated) return notFoundResponse("Model not found");
+
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "model.update",
+      resourceType: "model",
+      resourceId: updated.id,
+      resourceLabel: updated.alias,
+      changes: diff(beforeModel ?? null, updated),
+      req,
+    });
+
     return Response.json(updated);
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("unique")) {
@@ -93,5 +112,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .returning();
 
   if (!deleted) return notFoundResponse("Model not found");
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "model.delete",
+    resourceType: "model",
+    resourceId: deleted.id,
+    resourceLabel: deleted.alias,
+    changes: diff(deleted, null),
+    req,
+  });
+
   return Response.json({ success: true });
 }

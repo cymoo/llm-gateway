@@ -7,6 +7,7 @@ import {
   unauthorizedResponse,
   notFoundResponse,
 } from "@/app/api/admin/middleware";
+import { recordAudit } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -96,6 +97,18 @@ export async function POST(req: NextRequest, { params }: Params) {
       })
       .onConflictDoNothing();
   }
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "group.grant_model",
+    resourceType: "group",
+    resourceId: id,
+    resourceLabel: groupRows[0].name,
+    changes: { after: { model: model.alias } },
+    metadata: { modelId, modelAlias: model.alias },
+    req,
+  });
 
   return Response.json({ success: true }, { status: 201 });
 }
