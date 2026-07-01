@@ -10,6 +10,7 @@ import {
   badRequestResponse,
 } from "@/app/api/admin/middleware";
 import { validateAdminPassword } from "@/lib/utils/validators";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -83,6 +84,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
       .returning();
 
     if (!updated) return notFoundResponse("User not found");
+
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "user.update",
+      resourceType: "user",
+      resourceId: updated.id,
+      resourceLabel: updated.email,
+      changes: diff(existingUser, updated),
+      req,
+    });
+
     return Response.json(updated);
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("unique")) {
@@ -109,5 +122,17 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     .returning();
 
   if (!deleted) return notFoundResponse("User not found");
+
+  recordAudit({
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.delete",
+    resourceType: "user",
+    resourceId: deleted.id,
+    resourceLabel: deleted.email,
+    changes: diff(deleted, null),
+    req,
+  });
+
   return Response.json({ success: true });
 }

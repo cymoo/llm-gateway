@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -203,6 +204,35 @@ export const groupModelQuotas = pgTable(
   (table) => [unique().on(table.groupId, table.modelId)]
 );
 
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    // Soft references (no FK) so records survive deletion of the target and
+    // stay human-readable. adminId/resourceId are nullable (e.g. failed login).
+    adminId: uuid("admin_id"),
+    adminEmail: varchar("admin_email", { length: 255 }),
+    action: varchar("action", { length: 50 }).notNull(),
+    resourceType: varchar("resource_type", { length: 50 }),
+    resourceId: varchar("resource_id", { length: 64 }),
+    resourceLabel: varchar("resource_label", { length: 255 }),
+    status: varchar("status", { length: 20 }).notNull(),
+    changes: jsonb("changes"),
+    metadata: jsonb("metadata"),
+    clientIp: varchar("client_ip", { length: 45 }),
+    userAgent: varchar("user_agent", { length: 512 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).default(
+      sql`now()`
+    ),
+  },
+  (table) => [
+    index("idx_audit_logs_created_at").on(table.createdAt),
+    index("idx_audit_logs_admin_created").on(table.adminId, table.createdAt),
+    index("idx_audit_logs_resource").on(table.resourceType, table.resourceId),
+    index("idx_audit_logs_action").on(table.action),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Group = typeof groups.$inferSelect;
@@ -217,3 +247,5 @@ export type UserModelQuota = typeof userModelQuotas.$inferSelect;
 export type NewUserModelQuota = typeof userModelQuotas.$inferInsert;
 export type UsageLog = typeof usageLogs.$inferSelect;
 export type DailyUsage = typeof dailyUsage.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type NewAuditLog = typeof auditLogs.$inferInsert;

@@ -9,6 +9,7 @@ import {
   Users2,
   Cpu,
   BarChart3,
+  ScrollText,
   LogOut,
   Bot,
   Languages,
@@ -28,6 +29,7 @@ function Sidebar() {
     { href: "/admin/groups", label: t("nav.groups"), icon: Users2 },
     { href: "/admin/models", label: t("nav.models"), icon: Cpu },
     { href: "/admin/usage", label: t("nav.usage"), icon: BarChart3 },
+    { href: "/admin/audit", label: t("nav.audit"), icon: ScrollText },
   ];
 
   const handleLogout = async () => {

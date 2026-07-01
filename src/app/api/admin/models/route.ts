@@ -4,6 +4,7 @@ import { models, userModels } from "@/lib/db/schema";
 import { count, eq } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 import { validateModelAlias, validateUrl } from "@/lib/utils/validators";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 export async function GET(req: NextRequest) {
   const admin = await getAdminUser(req);
@@ -72,6 +73,17 @@ export async function POST(req: NextRequest) {
         defaultAllowedTimeEnd: rest.defaultAllowedTimeEnd ?? null,
       })
       .returning();
+
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "model.create",
+      resourceType: "model",
+      resourceId: model.id,
+      resourceLabel: model.alias,
+      changes: diff(null, model),
+      req,
+    });
 
     return Response.json(model, { status: 201 });
   } catch (err: unknown) {

@@ -4,6 +4,7 @@ import { users, groups, userModels, dailyUsage } from "@/lib/db/schema";
 import { eq, ilike, or, count, sql, and, inArray } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 import { generateApiKey } from "@/lib/utils/api-key";
+import { recordAudit, diff } from "@/lib/audit/recorder";
 
 export async function GET(req: NextRequest) {
   const admin = await getAdminUser(req);
@@ -136,6 +137,17 @@ export async function POST(req: NextRequest) {
       .insert(users)
       .values({ name, email, apiKey, remark, isActive: true, isAdmin: false, groupId: defaultGroupId })
       .returning();
+
+    recordAudit({
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "user.create",
+      resourceType: "user",
+      resourceId: user.id,
+      resourceLabel: user.email,
+      changes: diff(null, user),
+      req,
+    });
 
     return Response.json(user, { status: 201 });
   } catch (err: unknown) {
