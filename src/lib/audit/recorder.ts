@@ -106,6 +106,16 @@ function cap(value: string | null | undefined, max: number): string | null {
   return value.length > max ? value.slice(0, max) : value;
 }
 
+/** Enforce redaction at the sink: even if a caller passes an un-redacted
+ *  payload, secrets never reach the audit_logs table. Idempotent with diff(). */
+export function sanitizeDiff(d: AuditDiff | null | undefined): AuditDiff | null {
+  if (!d) return null;
+  const out: AuditDiff = {};
+  if (d.before) out.before = redactSecrets(d.before) ?? {};
+  if (d.after) out.after = redactSecrets(d.after) ?? {};
+  return out;
+}
+
 export function recordAudit(record: AuditRecord): void {
   const clientIp =
     record.clientIp ?? (record.req ? getClientIp(record.req) : null);
@@ -122,8 +132,8 @@ export function recordAudit(record: AuditRecord): void {
         resourceId: cap(record.resourceId, 64),
         resourceLabel: cap(record.resourceLabel, 255),
         status: cap(record.status ?? "success", 20) ?? "success",
-        changes: record.changes ?? null,
-        metadata: record.metadata ?? null,
+        changes: sanitizeDiff(record.changes),
+        metadata: redactSecrets(record.metadata),
         clientIp: cap(clientIp, 45),
         userAgent: cap(userAgent, 512),
       });
