@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-01
+
+### Added: Admin Audit Log
+
+- **Append-only audit trail** — every state-changing admin action (create/update/delete of users, groups, models, quotas, and model-access grants) plus security events (admin login, failed login, logout, and "View as User" impersonation) is now recorded to a dedicated `audit_logs` table. Records are written asynchronously, so auditing never slows down or breaks the original action.
+- **Rich, safe records** — each entry captures the acting admin, the action, the target (with a snapshot label that stays readable even after the referenced entity is deleted), a field-level before→after diff, client IP, user agent, and success/failure. Secrets (password hashes, API keys, backend keys) are always redacted, enforced centrally at the write layer so they can never reach the audit log.
+- **Audit dashboard** — a new read-only **Audit Log** page in the admin sidebar lets admins filter by admin, action, resource type, status, date range, and free-text search, inspect the before→after diff of any event, and export the filtered results to CSV.
+
 ## [0.1.3] - 2026-04-27
 
 ### 🐛 Bug Fixes
