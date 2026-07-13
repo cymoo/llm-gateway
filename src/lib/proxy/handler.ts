@@ -232,20 +232,23 @@ export async function handleProxy(
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
   // Rewrite model field to backend_model.
-  // For streaming requests, inject stream_options.include_usage so the backend
-  // emits a final usage chunk; otherwise streamed requests record 0 tokens.
-  const backendBody = {
+  const backendBody: Record<string, unknown> = {
     ...body,
     model: model.backendModel,
-    ...(isStream
-      ? {
-          stream_options: {
-            ...(body.stream_options as Record<string, unknown> | undefined),
-            include_usage: true,
-          },
-        }
-      : {}),
   };
+  if (requestType === "embeddings") {
+    // Embeddings are non-streaming; never forward streaming controls, even if
+    // the client sent them, so the upstream doesn't reject the request.
+    delete backendBody.stream;
+    delete backendBody.stream_options;
+  } else if (isStream) {
+    // Inject stream_options.include_usage so the backend emits a final usage
+    // chunk; otherwise streamed requests record 0 tokens.
+    backendBody.stream_options = {
+      ...(body.stream_options as Record<string, unknown> | undefined),
+      include_usage: true,
+    };
+  }
 
   const SUFFIX: Record<RequestType, string> = {
     "chat.completions": "chat/completions",

@@ -173,7 +173,12 @@ describe("handleProxy embeddings", () => {
 
     const req = {
       headers: new Headers({ authorization: "Bearer test-key" }),
-      json: async () => ({ model: "embed-test", input: "hi", stream: true }),
+      json: async () => ({
+        model: "embed-test",
+        input: "hi",
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
     };
 
     const res = await handleProxy(req as never, "embeddings");
@@ -182,6 +187,12 @@ describe("handleProxy embeddings", () => {
     expect(mockRecordUsage).toHaveBeenCalledWith(
       expect.objectContaining({ requestType: "embeddings", isStream: false, totalTokens: 5 })
     );
+
+    // Streaming controls must not be forwarded to the embeddings backend.
+    const forwardedBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(forwardedBody.stream).toBeUndefined();
+    expect(forwardedBody.stream_options).toBeUndefined();
+    expect(forwardedBody.model).toBe("bge-backend");
   });
 
   it("rejects an embeddings request against a chat model", async () => {
