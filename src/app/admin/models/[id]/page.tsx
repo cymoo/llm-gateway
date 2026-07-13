@@ -20,6 +20,7 @@ export default function ModelDetailPage() {
     alias: string;
     backendUrl: string;
     backendModel: string;
+    type: string;
     backendApiKey: string;
     remark: string;
     isActive: boolean;
@@ -42,6 +43,7 @@ export default function ModelDetailPage() {
           alias: data.alias || "",
           backendUrl: data.backendUrl || "",
           backendModel: data.backendModel || "",
+          type: data.type || "chat",
           backendApiKey: data.backendApiKey || "",
           remark: data.remark || "",
           isActive: data.isActive ?? true,
@@ -64,6 +66,7 @@ export default function ModelDetailPage() {
         alias: form.alias,
         backendUrl: form.backendUrl,
         backendModel: form.backendModel,
+        type: form.type,
         remark: form.remark || null,
         isActive: form.isActive,
         defaultMaxTokensPerDay: form.defaultMaxTokensPerDay

@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/lib/i18n";
 
@@ -16,6 +23,7 @@ interface ModelForm {
   alias: string;
   backendUrl: string;
   backendModel: string;
+  type: string;
   backendApiKey: string;
   remark: string;
   isActive: boolean;
@@ -30,6 +38,7 @@ const emptyForm: ModelForm = {
   alias: "",
   backendUrl: "",
   backendModel: "",
+  type: "chat",
   backendApiKey: "",
   remark: "",
   isActive: true,
@@ -115,6 +124,23 @@ export function ModelFormComponent({
                 required
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="type">{t("models.modelType")}</Label>
+            <Select value={form.type} onValueChange={(v) => set("type", v)}>
+              <SelectTrigger id="type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="chat">{t("models.typeChat")}</SelectItem>
+                <SelectItem value="embedding">
+                  {t("models.typeEmbedding")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              {t("models.typeHint")}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="backendApiKey">
@@ -255,6 +281,7 @@ export default function NewModelPage() {
         alias: form.alias,
         backendUrl: form.backendUrl,
         backendModel: form.backendModel,
+        type: form.type,
         backendApiKey: form.backendApiKey || undefined,
         remark: form.remark || null,
         isActive: form.isActive,

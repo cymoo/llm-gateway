@@ -4,6 +4,13 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### ✨ 向量（Embedding）模型支持
+
+- **兼容 OpenAI 的 `/api/v1/embeddings` 接口** — 网关现在通过与 chat/completions 完全相同的鉴权、授权、配额、限流与用量记账管线代理 embedding 请求。Embedding 仅记录 prompt tokens（`completion_tokens = 0`），用量日志无需数据库迁移。
+- **模型 `type` 字段** — 每个模型新增类型 `chat`（默认）或 `embedding`，在后台注册或编辑模型时设置。网关强制校验：`/api/v1/embeddings` 只能用于 `embedding` 模型，chat/completions 接口只能用于 `chat` 模型，否则返回 `404 model_type_mismatch`。该类型同时在 `GET /api/v1/models` 中返回。
+
 ## [0.2.0] - 2026-07-01
 
 ### ✨ 管理后台审计日志

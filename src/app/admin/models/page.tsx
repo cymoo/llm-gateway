@@ -28,6 +28,7 @@ interface Model {
   alias: string;
   backendUrl: string;
   backendModel: string;
+  type?: string;
   remark?: string | null;
   isActive: boolean;
   userCount: number;
@@ -177,7 +178,19 @@ export default function ModelsPage() {
             ) : (
               models.map((model) => (
                 <TableRow key={model.id}>
-                  <TableCell className="font-medium font-mono">{model.alias}</TableCell>
+                  <TableCell className="font-medium font-mono">
+                    <div className="flex items-center gap-2">
+                      {model.alias}
+                      <Badge
+                        variant="outline"
+                        className="font-sans text-xs font-normal"
+                      >
+                        {model.type === "embedding"
+                          ? t("models.typeEmbedding")
+                          : t("models.typeChat")}
+                      </Badge>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-sm text-[hsl(var(--muted-foreground))] max-w-xs truncate">
                     {model.backendUrl}
                   </TableCell>

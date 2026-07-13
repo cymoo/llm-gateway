@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added: Embedding Models
+
+- **OpenAI-compatible `/api/v1/embeddings` endpoint** — the gateway now proxies embedding requests through the same authentication, authorization, quota, rate-limiting, and usage-accounting pipeline as chat/completions. Embedding usage records prompt tokens only (`completion_tokens = 0`); no schema migration was needed for usage logging.
+- **Model `type` field** — each model is now typed `chat` (default) or `embedding`, set when registering or editing a model in the admin console. The gateway enforces that `/api/v1/embeddings` is used only with `embedding` models and the chat/completions endpoints only with `chat` models, returning `404 model_type_mismatch` otherwise. The type is also surfaced in `GET /api/v1/models`.
+
 ## [0.2.0] - 2026-07-01
 
 ### Added: Admin Audit Log

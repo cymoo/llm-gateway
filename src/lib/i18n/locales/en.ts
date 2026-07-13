@@ -242,6 +242,11 @@ const en = {
       "Only lowercase letters, digits, hyphens. Cannot start/end with hyphen.",
     backendUrlLabel: "Backend URL",
     backendModelName: "Backend Model Name",
+    modelType: "Model Type",
+    typeChat: "Chat / Completions",
+    typeEmbedding: "Embedding",
+    typeHint:
+      "Chat serves /chat/completions and /completions; embedding serves /embeddings.",
     backendApiKey: "Backend API Key",
     backendApiKeyOptional: "(optional)",
     remarkOptional: "(optional)",

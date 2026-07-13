@@ -9,7 +9,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 
 ## Features
 
-- Unified OpenAI-compatible `chat.completions` proxy endpoint
+- Unified OpenAI-compatible proxy endpoints — `chat.completions`, `completions`, and `embeddings`
 - Public self-registration (`/register`) with admin approval workflow
 - User and model access management
 - Quota and rate limiting per user/model

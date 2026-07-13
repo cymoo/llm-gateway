@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
     object: "model",
     created: Math.floor(new Date(model.createdAt!).getTime() / 1000),
     owned_by: "llm-gateway",
+    type: model.type ?? "chat",
   }));
 
   return Response.json({ object: "list", data });

@@ -93,5 +93,6 @@ export async function GET(
     object: "model",
     created: Math.floor(new Date(model.createdAt!).getTime() / 1000),
     owned_by: "llm-gateway",
+    type: model.type ?? "chat",
   });
 }
