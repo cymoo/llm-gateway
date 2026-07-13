@@ -732,17 +732,39 @@ llm-gateway/
       "id": "my-qwen3",
       "object": "model",
       "created": 1700000000,
-      "owned_by": "llm-gateway"
+      "owned_by": "llm-gateway",
+      "type": "chat",
+      "max_model_len": 131072
     },
     {
       "id": "my-qwen3.5",
       "object": "model",
       "created": 1700000000,
-      "owned_by": "llm-gateway"
+      "owned_by": "llm-gateway",
+      "type": "chat"
     }
   ]
 }
 ```
+
+`GET /api/v1/models/{model}` 返回其中单个条目（同样的字段）。
+
+**`max_model_len`（上下文窗口）**：网关自身不存储上下文窗口，而是按需探测后端的
+`GET <backend_url>/models`，从匹配 `backend_model` 的条目里读取窗口大小。为兼容不同
+后端，按“最具体优先”的顺序探测下列字段，取第一个存在的正整数：
+
+| 字段 | 来源 |
+| --- | --- |
+| `max_model_len` | vLLM、SGLang |
+| `context_window` | Groq |
+| `max_input_tokens` | Anthropic Models API（2026-03 起）、LiteLLM 代理 |
+| `loaded_context_length` | LM Studio（仅 `/api/v0`） |
+| `context_length` | OpenRouter（模型级）、Together |
+| `max_context_length` | LM Studio（理论最大值） |
+
+探测结果按后端 URL 缓存（默认 5 分钟，`MODELS_WINDOW_CACHE_TTL_MS` 可调；请求超时
+`MODELS_WINDOW_FETCH_TIMEOUT_MS`，默认 10 秒）。这是尽力而为的增强：后端不可达、超时或
+未声明窗口时，`max_model_len` 字段会被省略，不影响其余响应。
 
 ### 9.2 模型别名校验规则
 
