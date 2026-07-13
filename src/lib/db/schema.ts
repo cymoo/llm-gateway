@@ -59,6 +59,7 @@ export const models = pgTable(
     backendUrl: varchar("backend_url", { length: 500 }).notNull(),
     backendModel: varchar("backend_model", { length: 200 }).notNull(),
     backendApiKey: varchar("backend_api_key", { length: 200 }),
+    type: varchar("type", { length: 20 }).notNull().default("chat"),
     remark: varchar("remark", { length: 1000 }),
     isActive: boolean("is_active").default(true),
     defaultMaxTokensPerDay: bigint("default_max_tokens_per_day", {

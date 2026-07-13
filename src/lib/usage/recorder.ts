@@ -5,7 +5,7 @@ import { sql } from "drizzle-orm";
 export interface UsageRecord {
   userId: string;
   modelId: string;
-  requestType: "chat.completions" | "completions";
+  requestType: "chat.completions" | "completions" | "embeddings";
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;

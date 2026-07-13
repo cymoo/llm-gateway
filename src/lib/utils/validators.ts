@@ -23,3 +23,10 @@ export function validateUrl(url: string): boolean {
     return false;
   }
 }
+
+export const MODEL_TYPES = ["chat", "embedding"] as const;
+export type ModelType = (typeof MODEL_TYPES)[number];
+
+export function validateModelType(type: string): boolean {
+  return (MODEL_TYPES as readonly string[]).includes(type);
+}

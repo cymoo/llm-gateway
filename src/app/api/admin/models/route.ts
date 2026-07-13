@@ -3,7 +3,11 @@ import { db } from "@/lib/db";
 import { models, userModels } from "@/lib/db/schema";
 import { count, eq } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
-import { validateModelAlias, validateUrl } from "@/lib/utils/validators";
+import {
+  validateModelAlias,
+  validateModelType,
+  validateUrl,
+} from "@/lib/utils/validators";
 import { recordAudit, diff } from "@/lib/audit/recorder";
 
 export async function GET(req: NextRequest) {
@@ -33,7 +37,8 @@ export async function POST(req: NextRequest) {
   if (!admin) return unauthorizedResponse();
 
   const body = await req.json();
-  const { alias, backendUrl, backendModel, backendApiKey, ...rest } = body;
+  const { alias, backendUrl, backendModel, backendApiKey, type, ...rest } =
+    body;
 
   if (!alias || !backendUrl || !backendModel) {
     return Response.json(
@@ -56,6 +61,13 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid backendUrl" }, { status: 400 });
   }
 
+  if (type !== undefined && !validateModelType(type)) {
+    return Response.json(
+      { error: "Invalid type: must be 'chat' or 'embedding'" },
+      { status: 400 }
+    );
+  }
+
   try {
     const [model] = await db
       .insert(models)
@@ -64,6 +76,7 @@ export async function POST(req: NextRequest) {
         backendUrl,
         backendModel,
         backendApiKey: backendApiKey || null,
+        type: type ?? "chat",
         remark: rest.remark,
         isActive: rest.isActive ?? true,
         defaultMaxTokensPerDay: rest.defaultMaxTokensPerDay ?? null,

@@ -7,7 +7,11 @@ import {
   unauthorizedResponse,
   notFoundResponse,
 } from "@/app/api/admin/middleware";
-import { validateModelAlias, validateUrl } from "@/lib/utils/validators";
+import {
+  validateModelAlias,
+  validateModelType,
+  validateUrl,
+} from "@/lib/utils/validators";
 import { recordAudit, diff } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
@@ -37,12 +41,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return Response.json({ error: "Invalid backendUrl" }, { status: 400 });
   }
 
+  if (body.type !== undefined && !validateModelType(body.type)) {
+    return Response.json(
+      { error: "Invalid type: must be 'chat' or 'embedding'" },
+      { status: 400 }
+    );
+  }
+
   const updates: Partial<typeof models.$inferInsert> = {};
   const fields = [
     "alias",
     "backendUrl",
     "backendModel",
     "backendApiKey",
+    "type",
     "remark",
     "isActive",
     "defaultMaxTokensPerDay",

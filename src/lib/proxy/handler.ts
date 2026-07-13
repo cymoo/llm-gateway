@@ -14,7 +14,7 @@ const PROXY_TIMEOUT_STREAM = parseInt(
   process.env.PROXY_TIMEOUT_STREAM || "600000"
 );
 
-export type RequestType = "chat.completions" | "completions";
+export type RequestType = "chat.completions" | "completions" | "embeddings";
 
 export async function handleProxy(
   req: NextRequest,
@@ -93,15 +93,26 @@ export async function handleProxy(
     );
   }
 
-  // Extract prompt preview from messages
+  // Extract prompt preview: embeddings send `input`, chat/completions send `messages`
   let promptPreview: string | null = null;
-  const messages = body.messages as Array<{ role?: string; content?: string }> | undefined;
-  if (Array.isArray(messages)) {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const messageContent = messages[i].content;
-      if (messages[i].role === "user" && typeof messageContent === "string") {
-        promptPreview = messageContent;
-        break;
+  if (requestType === "embeddings") {
+    const input = body.input;
+    if (typeof input === "string") {
+      promptPreview = input;
+    } else if (Array.isArray(input) && typeof input[0] === "string") {
+      promptPreview = input[0] as string;
+    }
+  } else {
+    const messages = body.messages as
+      | Array<{ role?: string; content?: string }>
+      | undefined;
+    if (Array.isArray(messages)) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const messageContent = messages[i].content;
+        if (messages[i].role === "user" && typeof messageContent === "string") {
+          promptPreview = messageContent;
+          break;
+        }
       }
     }
   }
@@ -129,6 +140,21 @@ export async function handleProxy(
   }
 
   const model = modelRows[0];
+
+  // Enforce endpoint <-> model type: the embeddings endpoint requires an
+  // embedding model, and chat/completions endpoints require a chat model.
+  // Rows without an explicit type (legacy data / test mocks) default to "chat".
+  const expectedType = requestType === "embeddings" ? "embedding" : "chat";
+  if ((model.type ?? "chat") !== expectedType) {
+    return makeProxyError(
+      `Model '${modelAlias}' does not support the ${
+        requestType === "embeddings" ? "embeddings" : "chat/completions"
+      } endpoint`,
+      "not_found_error",
+      "model_type_mismatch",
+      404
+    );
+  }
 
   // 4. Authorize — group models take precedence; user's own models are also valid
   const isDefaultGroup = !group || group.isDefault;
@@ -200,7 +226,9 @@ export async function handleProxy(
   if (quotaError) return quotaError;
 
   // 6. Forward request
-  const isStream = body.stream === true;
+  // Embeddings are always non-streaming; ignore a spurious `stream: true` so the
+  // response is proxied as JSON and token usage is accounted correctly.
+  const isStream = requestType !== "embeddings" && body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
   // Rewrite model field to backend_model.
@@ -219,8 +247,13 @@ export async function handleProxy(
       : {}),
   };
 
+  const SUFFIX: Record<RequestType, string> = {
+    "chat.completions": "chat/completions",
+    completions: "completions",
+    embeddings: "embeddings",
+  };
   const backendUrl = `${model.backendUrl.replace(/\/$/, "")}/${
-    requestType === "chat.completions" ? "chat/completions" : "completions"
+    SUFFIX[requestType]
   }`;
 
   const headers: Record<string, string> = {

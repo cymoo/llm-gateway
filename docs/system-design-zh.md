@@ -136,6 +136,7 @@ CREATE TABLE models (
     backend_url                     VARCHAR(500) NOT NULL,          -- 如 http://ip1:port1/v1
     backend_model                   VARCHAR(200) NOT NULL,          -- 真实模型名
     backend_api_key                 VARCHAR(200),                   -- 后端 API Key（可选）
+    type                            VARCHAR(20) NOT NULL DEFAULT 'chat', -- 'chat' | 'embedding'
     is_active                       BOOLEAN DEFAULT true,
 
     -- 默认限额模板（新用户授权时自动继承）
@@ -182,7 +183,7 @@ CREATE TABLE usage_logs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id             UUID REFERENCES users(id),
     model_id            UUID REFERENCES models(id),
-    request_type        VARCHAR(50) NOT NULL,     -- "chat.completions" | "completions"
+    request_type        VARCHAR(50) NOT NULL,     -- "chat.completions" | "completions" | "embeddings"
     prompt_tokens       INT DEFAULT 0,
     completion_tokens   INT DEFAULT 0,
     total_tokens        INT DEFAULT 0,
@@ -247,8 +248,9 @@ ADMIN_PASSWORD=your-secure-password
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| `POST` | `/api/v1/chat/completions` | Chat Completions（支持 stream、tools） |
-| `POST` | `/api/v1/completions` | Completions（支持 stream） |
+| `POST` | `/api/v1/chat/completions` | Chat Completions（支持 stream、tools；仅 `type=chat` 的模型） |
+| `POST` | `/api/v1/completions` | Completions（支持 stream；仅 `type=chat` 的模型） |
+| `POST` | `/api/v1/embeddings` | Embeddings（向量嵌入；仅 `type=embedding` 的模型） |
 | `GET` | `/api/v1/models` | 返回当前用户被授权的模型列表 |
 | `GET` | `/api/v1/models/{model}` | 返回单个模型详情 |
 | `GET` | `/api/health` | 健康检查（无需认证） |
@@ -293,6 +295,7 @@ Body:  { "model": "qwen3", ... }   ← alias 替换为 backend_model
 | 用户已禁用 | 403 | `permission_error` | `user_disabled` |
 | 无权访问该模型 | 403 | `permission_error` | `model_not_allowed` |
 | 模型不存在 | 404 | `not_found_error` | `model_not_found` |
+| 端点与模型类型不匹配 | 404 | `not_found_error` | `model_type_mismatch` |
 | 每日 token 超限 | 429 | `rate_limit_error` | `daily_token_limit` |
 | 每日请求次数超限 | 429 | `rate_limit_error` | `daily_request_limit` |
 | 每分钟请求超限 | 429 | `rate_limit_error` | `rate_limit_exceeded` |

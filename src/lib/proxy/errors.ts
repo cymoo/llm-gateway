@@ -10,6 +10,7 @@ export type ProxyErrorCode =
   | "user_disabled"
   | "model_not_allowed"
   | "model_not_found"
+  | "model_type_mismatch"
   | "daily_token_limit"
   | "daily_request_limit"
   | "rate_limit_exceeded"

@@ -2,7 +2,7 @@
 
 一个基于 **Next.js 16** + **Drizzle ORM** + **PostgreSQL** 的 LLM 网关项目，提供：
 
-- 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`）
+- 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`、`completions`、`embeddings`）
 - 公开自助注册（`/register`）+ 管理员审批流程
 - 用户与模型权限管理
 - 用户/模型配额与限流控制

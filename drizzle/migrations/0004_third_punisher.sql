@@ -1,0 +1,1 @@
+ALTER TABLE "models" ADD COLUMN "type" varchar(20) DEFAULT 'chat' NOT NULL;
