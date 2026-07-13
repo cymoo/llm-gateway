@@ -797,7 +797,15 @@ sk-<32位随机十六进制字符>
 
 ### 9.5 模型连通性测试
 
-`POST /api/admin/models/{id}/test` 向后端发送 `GET <backend_url>/models`，10 秒超时：
+`POST /api/admin/models/{id}/test` 用最小请求真实调用该模型，验证完整链路（后端 URL、
+`backend_model`、鉴权、端点），而非仅探测主机可达性：
+
+- chat 模型：`POST <backend_url>/chat/completions`，body `{model, messages:[{role:"user",content:"ping"}], max_tokens:1}`
+- embedding 模型：`POST <backend_url>/embeddings`，body `{model, input:"ping"}`
+
+超时默认 15 秒（`MODEL_TEST_TIMEOUT_MS` 可调）。失败时会带上后端返回的状态码与响应片段，
+便于定位错误的模型名 / 密钥 / URL。（注意：embedding 后端常不提供 `GET /models`，旧的
+连通性探测会对其误报 404。）
 
 ```json
 // 成功
