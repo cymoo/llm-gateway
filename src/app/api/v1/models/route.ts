@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
+import { getBackendContextWindows } from "@/lib/proxy/context-window";
 
 async function authenticate(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -63,13 +64,35 @@ export async function GET(req: NextRequest) {
   }
   const authorizedModels = Array.from(modelMap.values());
 
-  const data = authorizedModels.map((model) => ({
-    id: model.alias,
-    object: "model",
-    created: Math.floor(new Date(model.createdAt!).getTime() / 1000),
-    owned_by: "llm-gateway",
-    type: model.type ?? "chat",
-  }));
+  // Probe each distinct backend's /models once (cached) to discover context
+  // windows, then attach them by backend model id. Best-effort: a model whose
+  // backend is unreachable or advertises no window simply omits the field.
+  const backendKeys = new Map<string, string | null>();
+  for (const model of authorizedModels) {
+    if (model.backendUrl && !backendKeys.has(model.backendUrl)) {
+      backendKeys.set(model.backendUrl, model.backendApiKey ?? null);
+    }
+  }
+  const windowMaps = new Map<string, Map<string, number>>();
+  await Promise.all(
+    Array.from(backendKeys, async ([url, key]) => {
+      windowMaps.set(url, await getBackendContextWindows(url, key));
+    })
+  );
+
+  const data = authorizedModels.map((model) => {
+    const maxModelLen = windowMaps
+      .get(model.backendUrl)
+      ?.get(model.backendModel);
+    return {
+      id: model.alias,
+      object: "model",
+      created: Math.floor(new Date(model.createdAt!).getTime() / 1000),
+      owned_by: "llm-gateway",
+      type: model.type ?? "chat",
+      ...(maxModelLen !== undefined ? { max_model_len: maxModelLen } : {}),
+    };
+  });
 
   return Response.json({ object: "list", data });
 }

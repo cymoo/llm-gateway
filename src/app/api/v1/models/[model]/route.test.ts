@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn() }));
 
@@ -6,6 +6,7 @@ vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
 
 import { GET } from "./route";
 import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
+import { _resetContextWindowCache } from "@/lib/proxy/context-window";
 
 // Chainable drizzle mock that routes results by the table passed to `.from()`.
 function setupDb(resolver: (table: unknown) => unknown[]) {
@@ -26,6 +27,8 @@ const model = {
   id: "id-a",
   alias: "model-a",
   isActive: true,
+  backendUrl: "http://backend/v1",
+  backendModel: "backend-a",
   createdAt: new Date("2026-01-01T00:00:00Z"),
 };
 
@@ -35,9 +38,13 @@ const req = {
 const params = { params: Promise.resolve({ model: "model-a" }) };
 
 describe("GET /api/v1/models/[model]", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetContextWindowCache();
+  });
+  afterEach(() => vi.unstubAllGlobals());
 
-  it("authorizes a non-default group user via their personal model list", async () => {
+  it("authorizes a non-default group user via their personal model list and attaches the window", async () => {
     setupDb((table) => {
       if (table === models) return [model];
       if (table === users)
@@ -48,11 +55,21 @@ describe("GET /api/v1/models/[model]", () => {
       if (table === userModels) return [{ userId: "user-1", modelId: "id-a" }];
       return [];
     });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({ data: [{ id: "backend-a", max_model_len: 32768 }] }),
+          { status: 200 }
+        )
+      )
+    );
 
     const res = await GET(req, params);
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.id).toBe("model-a");
+    expect(body.max_model_len).toBe(32768);
   });
 
   it("rejects when the model is in neither the group nor the personal list", async () => {

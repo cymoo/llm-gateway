@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
+import { getBackendContextWindows } from "@/lib/proxy/context-window";
 
 async function authenticate(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -88,11 +89,20 @@ export async function GET(
     );
   }
 
+  // Best-effort context window from the backend's /models (cached); omitted
+  // when the backend is unreachable or advertises no window.
+  const windows = await getBackendContextWindows(
+    model.backendUrl,
+    model.backendApiKey
+  );
+  const maxModelLen = windows.get(model.backendModel);
+
   return Response.json({
     id: model.alias,
     object: "model",
     created: Math.floor(new Date(model.createdAt!).getTime() / 1000),
     owned_by: "llm-gateway",
     type: model.type ?? "chat",
+    ...(maxModelLen !== undefined ? { max_model_len: maxModelLen } : {}),
   });
 }
