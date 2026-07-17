@@ -245,8 +245,9 @@ const en = {
     modelType: "Model Type",
     typeChat: "Chat / Completions",
     typeEmbedding: "Embedding",
+    typeRerank: "Rerank",
     typeHint:
-      "Chat serves /chat/completions and /completions; embedding serves /embeddings.",
+      "Chat serves /chat/completions and /completions; embedding serves /embeddings; rerank serves /rerank.",
     backendApiKey: "Backend API Key",
     backendApiKeyOptional: "(optional)",
     remarkOptional: "(optional)",

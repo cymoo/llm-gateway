@@ -4,6 +4,7 @@ import { models, userModels } from "@/lib/db/schema";
 import { count, eq } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 import {
+  MODEL_TYPES,
   validateModelAlias,
   validateModelType,
   validateUrl,
@@ -63,7 +64,11 @@ export async function POST(req: NextRequest) {
 
   if (type !== undefined && !validateModelType(type)) {
     return Response.json(
-      { error: "Invalid type: must be 'chat' or 'embedding'" },
+      {
+        error: `Invalid type: must be one of ${MODEL_TYPES.map(
+          (t) => `'${t}'`
+        ).join(", ")}`,
+      },
       { status: 400 }
     );
   }

@@ -245,3 +245,170 @@ describe("handleProxy embeddings", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("handleProxy rerank", () => {
+  function setupDb(modelRow: Record<string, unknown>) {
+    let i = 0;
+    const results = [
+      [{ id: "user-1", isActive: true, groupId: "group-default" }],
+      [{ id: "group-default", isDefault: true }],
+      [modelRow],
+      [{ userId: "user-1", modelId: "model-1" }],
+    ];
+    mockSelect.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve(results[i++]),
+        }),
+      }),
+    }));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCheckQuota.mockResolvedValue(null);
+  });
+
+  it("proxies to /rerank and records prompt-only usage from the query", async () => {
+    setupDb({
+      id: "model-1",
+      alias: "rerank-test",
+      backendUrl: "http://backend",
+      backendModel: "bge-reranker-backend",
+      type: "rerank",
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [{ index: 0, relevance_score: 0.9 }],
+          usage: { prompt_tokens: 7, total_tokens: 7 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({
+        model: "rerank-test",
+        query: "what is the capital of France?",
+        documents: ["Paris is the capital of France.", "Berlin is in Germany."],
+      }),
+    };
+
+    const res = await handleProxy(req as never, "rerank");
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("http://backend/rerank");
+    expect(mockRecordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestType: "rerank",
+        promptTokens: 7,
+        completionTokens: 0,
+        totalTokens: 7,
+        promptPreview: "what is the capital of France?",
+      })
+    );
+
+    // The gateway rewrites the model but forwards query/documents verbatim.
+    const forwardedBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(forwardedBody.model).toBe("bge-reranker-backend");
+    expect(forwardedBody.query).toBe("what is the capital of France?");
+    expect(forwardedBody.documents).toHaveLength(2);
+  });
+
+  it("treats a spurious stream:true on rerank as non-streaming", async () => {
+    setupDb({
+      id: "model-1",
+      alias: "rerank-test",
+      backendUrl: "http://backend",
+      backendModel: "bge-reranker-backend",
+      type: "rerank",
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          results: [{ index: 0, relevance_score: 0.9 }],
+          usage: { prompt_tokens: 4, total_tokens: 4 },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({
+        model: "rerank-test",
+        query: "hi",
+        documents: ["a", "b"],
+        stream: true,
+        stream_options: { include_usage: true },
+      }),
+    };
+
+    const res = await handleProxy(req as never, "rerank");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(mockRecordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ requestType: "rerank", isStream: false, totalTokens: 4 })
+    );
+
+    // Streaming controls must not be forwarded to the rerank backend.
+    const forwardedBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(forwardedBody.stream).toBeUndefined();
+    expect(forwardedBody.stream_options).toBeUndefined();
+    expect(forwardedBody.model).toBe("bge-reranker-backend");
+  });
+
+  it("rejects a rerank request against a chat model", async () => {
+    setupDb({
+      id: "model-1",
+      alias: "gpt-test",
+      backendUrl: "http://backend",
+      backendModel: "gpt-backend",
+      type: "chat",
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({ model: "gpt-test", query: "hi", documents: ["a"] }),
+    };
+
+    const res = await handleProxy(req as never, "rerank");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error.code).toBe("model_type_mismatch");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockRecordUsage).not.toHaveBeenCalled();
+  });
+
+  it("rejects a chat request against a rerank model", async () => {
+    setupDb({
+      id: "model-1",
+      alias: "rerank-test",
+      backendUrl: "http://backend",
+      backendModel: "bge-reranker-backend",
+      type: "rerank",
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const req = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({
+        model: "rerank-test",
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    };
+
+    const res = await handleProxy(req as never, "chat.completions");
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error.code).toBe("model_type_mismatch");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

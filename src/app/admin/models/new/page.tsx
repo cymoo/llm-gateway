@@ -136,6 +136,9 @@ export function ModelFormComponent({
                 <SelectItem value="embedding">
                   {t("models.typeEmbedding")}
                 </SelectItem>
+                <SelectItem value="rerank">
+                  {t("models.typeRerank")}
+                </SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-[hsl(var(--muted-foreground))]">

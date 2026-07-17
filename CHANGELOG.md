@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added: Rerank Models
+
+- **OpenAI-compatible `/api/v1/rerank` endpoint** — the gateway now proxies rerank requests (`{ query, documents }`) through the same authentication, authorization, quota, rate-limiting, and usage-accounting pipeline as chat and embeddings. Requests are forwarded to `{backendUrl}/rerank`, so any Jina / vLLM / Xinference / TEI / Cohere-compatible rerank backend works by configuring the model's backend URL. Rerank is always non-streaming; usage records the upstream `prompt_tokens`/`total_tokens` when returned (`completion_tokens = 0`). No schema migration was needed.
+- **`rerank` model type** — models can now be typed `rerank` (alongside `chat` and `embedding`) when registering or editing a model in the admin console, and the admin **Test** button probes the real `/rerank` endpoint with a minimal payload. The gateway enforces that `/api/v1/rerank` is used only with `rerank` models, returning `404 model_type_mismatch` otherwise. The type is also surfaced in `GET /api/v1/models`.
+
 ## [0.3.0] - 2026-07-13
 
 ### Added: Embedding Models
