@@ -14,7 +14,32 @@ const PROXY_TIMEOUT_STREAM = parseInt(
   process.env.PROXY_TIMEOUT_STREAM || "600000"
 );
 
-export type RequestType = "chat.completions" | "completions" | "embeddings";
+export type RequestType =
+  | "chat.completions"
+  | "completions"
+  | "embeddings"
+  | "rerank";
+
+// Model `type` required by each request endpoint. The endpoint and the model's
+// declared type must match; rows without an explicit type default to "chat".
+const REQUEST_TYPE_TO_MODEL_TYPE: Record<RequestType, string> = {
+  "chat.completions": "chat",
+  completions: "chat",
+  embeddings: "embedding",
+  rerank: "rerank",
+};
+
+// Upstream path segment appended to the model's backendUrl per request type.
+const SUFFIX: Record<RequestType, string> = {
+  "chat.completions": "chat/completions",
+  completions: "completions",
+  embeddings: "embeddings",
+  rerank: "rerank",
+};
+
+// Request types that are always non-streaming: any client-sent streaming
+// controls are ignored and stripped before forwarding upstream.
+const NON_STREAMING_TYPES = new Set<RequestType>(["embeddings", "rerank"]);
 
 export async function handleProxy(
   req: NextRequest,
@@ -93,7 +118,8 @@ export async function handleProxy(
     );
   }
 
-  // Extract prompt preview: embeddings send `input`, chat/completions send `messages`
+  // Extract prompt preview: embeddings send `input`, rerank sends `query`,
+  // chat/completions send `messages`.
   let promptPreview: string | null = null;
   if (requestType === "embeddings") {
     const input = body.input;
@@ -101,6 +127,11 @@ export async function handleProxy(
       promptPreview = input;
     } else if (Array.isArray(input) && typeof input[0] === "string") {
       promptPreview = input[0] as string;
+    }
+  } else if (requestType === "rerank") {
+    const query = body.query;
+    if (typeof query === "string") {
+      promptPreview = query;
     }
   } else {
     const messages = body.messages as
@@ -141,15 +172,14 @@ export async function handleProxy(
 
   const model = modelRows[0];
 
-  // Enforce endpoint <-> model type: the embeddings endpoint requires an
-  // embedding model, and chat/completions endpoints require a chat model.
-  // Rows without an explicit type (legacy data / test mocks) default to "chat".
-  const expectedType = requestType === "embeddings" ? "embedding" : "chat";
+  // Enforce endpoint <-> model type: each endpoint requires a model of the
+  // matching type (embeddings -> "embedding", rerank -> "rerank", chat and
+  // completions -> "chat"). Rows without an explicit type (legacy data / test
+  // mocks) default to "chat".
+  const expectedType = REQUEST_TYPE_TO_MODEL_TYPE[requestType];
   if ((model.type ?? "chat") !== expectedType) {
     return makeProxyError(
-      `Model '${modelAlias}' does not support the ${
-        requestType === "embeddings" ? "embeddings" : "chat/completions"
-      } endpoint`,
+      `Model '${modelAlias}' does not support the ${SUFFIX[requestType]} endpoint`,
       "not_found_error",
       "model_type_mismatch",
       404
@@ -226,9 +256,10 @@ export async function handleProxy(
   if (quotaError) return quotaError;
 
   // 6. Forward request
-  // Embeddings are always non-streaming; ignore a spurious `stream: true` so the
-  // response is proxied as JSON and token usage is accounted correctly.
-  const isStream = requestType !== "embeddings" && body.stream === true;
+  // Embeddings and rerank are always non-streaming; ignore a spurious
+  // `stream: true` so the response is proxied as JSON and token usage is
+  // accounted correctly.
+  const isStream = !NON_STREAMING_TYPES.has(requestType) && body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
   // Rewrite model field to backend_model.
@@ -236,9 +267,9 @@ export async function handleProxy(
     ...body,
     model: model.backendModel,
   };
-  if (requestType === "embeddings") {
-    // Embeddings are non-streaming; never forward streaming controls, even if
-    // the client sent them, so the upstream doesn't reject the request.
+  if (NON_STREAMING_TYPES.has(requestType)) {
+    // Non-streaming endpoints never forward streaming controls, even if the
+    // client sent them, so the upstream doesn't reject the request.
     delete backendBody.stream;
     delete backendBody.stream_options;
   } else if (isStream) {
@@ -250,11 +281,6 @@ export async function handleProxy(
     };
   }
 
-  const SUFFIX: Record<RequestType, string> = {
-    "chat.completions": "chat/completions",
-    completions: "completions",
-    embeddings: "embeddings",
-  };
   const backendUrl = `${model.backendUrl.replace(/\/$/, "")}/${
     SUFFIX[requestType]
   }`;

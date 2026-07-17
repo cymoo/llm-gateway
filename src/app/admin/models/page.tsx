@@ -187,6 +187,8 @@ export default function ModelsPage() {
                       >
                         {model.type === "embedding"
                           ? t("models.typeEmbedding")
+                          : model.type === "rerank"
+                          ? t("models.typeRerank")
                           : t("models.typeChat")}
                       </Badge>
                     </div>

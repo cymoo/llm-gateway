@@ -24,7 +24,7 @@ export function validateUrl(url: string): boolean {
   }
 }
 
-export const MODEL_TYPES = ["chat", "embedding"] as const;
+export const MODEL_TYPES = ["chat", "embedding", "rerank"] as const;
 export type ModelType = (typeof MODEL_TYPES)[number];
 
 export function validateModelType(type: string): boolean {

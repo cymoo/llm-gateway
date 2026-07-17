@@ -4,6 +4,13 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### ✨ 重排序（Rerank）模型支持
+
+- **兼容 OpenAI 的 `/api/v1/rerank` 接口** — 网关现在通过与 chat、embeddings 完全相同的鉴权、授权、配额、限流与用量记账管线代理 rerank 请求（`{ query, documents }`）。请求被转发到 `{backendUrl}/rerank`，因此只需配置模型的后端 URL，即可接入任意兼容 Jina / vLLM / Xinference / TEI / Cohere 的重排序后端。Rerank 始终为非流式；当上游返回时记录 `prompt_tokens`/`total_tokens`（`completion_tokens = 0`）。无需数据库迁移。
+- **`rerank` 模型类型** — 在后台注册或编辑模型时，模型类型新增 `rerank`（与 `chat`、`embedding` 并列），后台的**测试**按钮会以最小载荷探测真实的 `/rerank` 接口。网关强制校验：`/api/v1/rerank` 只能用于 `rerank` 模型，否则返回 `404 model_type_mismatch`。该类型同时在 `GET /api/v1/models` 中返回。
+
 ## [0.3.0] - 2026-07-13
 
 ### ✨ 向量（Embedding）模型支持

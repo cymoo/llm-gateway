@@ -239,7 +239,9 @@ const zh: Translations = {
     modelType: "模型类型",
     typeChat: "对话 / 补全",
     typeEmbedding: "向量（Embedding）",
-    typeHint: "对话类型服务 /chat/completions 与 /completions；向量类型服务 /embeddings。",
+    typeRerank: "重排序（Rerank）",
+    typeHint:
+      "对话类型服务 /chat/completions 与 /completions；向量类型服务 /embeddings；重排序类型服务 /rerank。",
     backendApiKey: "后端 API 密钥",
     backendApiKeyOptional: "（可选）",
     remarkOptional: "（可选）",

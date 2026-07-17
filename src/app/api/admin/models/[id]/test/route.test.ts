@@ -89,6 +89,32 @@ describe("POST /api/admin/models/[id]/test", () => {
     expect(sent.messages).toBeUndefined();
   });
 
+  it("tests a rerank model via POST /rerank with query and documents", async () => {
+    setupModel({
+      id: "id-a",
+      type: "rerank",
+      backendUrl: "http://rerank/v1",
+      backendModel: "bge-reranker-v2-m3",
+      backendApiKey: null,
+    });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ results: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await POST(req, params);
+    expect((await res.json()).status).toBe("ok");
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://rerank/v1/rerank");
+    const sent = JSON.parse(init.body);
+    expect(sent.model).toBe("bge-reranker-v2-m3");
+    expect(sent.query).toBe("ping");
+    expect(sent.documents).toEqual(["ping"]);
+    expect(sent.messages).toBeUndefined();
+    expect(sent.input).toBeUndefined();
+  });
+
   it("surfaces the backend error status and body on failure", async () => {
     setupModel({
       id: "id-a",

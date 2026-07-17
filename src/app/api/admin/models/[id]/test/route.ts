@@ -28,17 +28,30 @@ export async function POST(req: NextRequest, { params }: Params) {
   // reachable. A plain `GET /models` ping can't tell a working model from a
   // wrong model id, and embedding-only backends (TEI, Infinity, etc.) often
   // don't expose `/models` at all, so that ping 404s even when the model works.
-  const isEmbedding = (model.type ?? "chat") === "embedding";
+  const modelType = model.type ?? "chat";
   const base = model.backendUrl.replace(/\/$/, "");
-  const testUrl = `${base}/${isEmbedding ? "embeddings" : "chat/completions"}`;
-  const testBody = isEmbedding
-    ? { model: model.backendModel, input: "ping" }
-    : {
-        model: model.backendModel,
-        messages: [{ role: "user", content: "ping" }],
-        max_tokens: 1,
-        stream: false,
-      };
+
+  let testUrl: string;
+  let testBody: Record<string, unknown>;
+  if (modelType === "embedding") {
+    testUrl = `${base}/embeddings`;
+    testBody = { model: model.backendModel, input: "ping" };
+  } else if (modelType === "rerank") {
+    testUrl = `${base}/rerank`;
+    testBody = {
+      model: model.backendModel,
+      query: "ping",
+      documents: ["ping"],
+    };
+  } else {
+    testUrl = `${base}/chat/completions`;
+    testBody = {
+      model: model.backendModel,
+      messages: [{ role: "user", content: "ping" }],
+      max_tokens: 1,
+      stream: false,
+    };
+  }
 
   const start = Date.now();
   const controller = new AbortController();
