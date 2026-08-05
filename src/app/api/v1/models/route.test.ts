@@ -5,7 +5,13 @@ const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
 
 import { GET } from "./route";
-import { users, groups, userModels, groupModels } from "@/lib/db/schema";
+import {
+  users,
+  groups,
+  userModels,
+  groupModels,
+  modelBackends,
+} from "@/lib/db/schema";
 import { _resetContextWindowCache } from "@/lib/proxy/context-window";
 
 // Chainable drizzle mock that routes results by the table passed to `.from()`,
@@ -92,27 +98,24 @@ describe("GET /api/v1/models", () => {
       if (table === users)
         return [{ id: "user-1", apiKey: "test-key", isActive: true, groupId: "group-1" }];
       if (table === groups) return [{ id: "group-1", isDefault: true }];
-      if (table === userModels)
+      if (table === userModels) return [{ model: modelA }, { model: modelB }];
+      if (table === modelBackends)
         return [
           {
-            model: {
-              id: "id-a",
-              alias: "model-a",
-              backendUrl: "http://backend/v1",
-              backendModel: "backend-a",
-              createdAt: new Date("2026-01-01T00:00:00Z"),
-              isActive: true,
-            },
+            id: "backend-a",
+            modelId: "id-a",
+            backendUrl: "http://backend/v1",
+            backendModel: "backend-a",
+            backendApiKey: null,
+            isActive: true,
           },
           {
-            model: {
-              id: "id-b",
-              alias: "model-b",
-              backendUrl: "http://backend/v1",
-              backendModel: "backend-b",
-              createdAt: new Date("2026-01-01T00:00:00Z"),
-              isActive: true,
-            },
+            id: "backend-b",
+            modelId: "id-b",
+            backendUrl: "http://backend/v1",
+            backendModel: "backend-b",
+            backendApiKey: null,
+            isActive: true,
           },
         ];
       return [];
@@ -137,5 +140,58 @@ describe("GET /api/v1/models", () => {
     expect(byId["model-b"]).not.toHaveProperty("max_model_len");
     // Shared backend probed once, not once per model.
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the minimum window across a model's backends", async () => {
+    setupDb((table) => {
+      if (table === users)
+        return [{ id: "user-1", apiKey: "test-key", isActive: true, groupId: "group-1" }];
+      if (table === groups) return [{ id: "group-1", isDefault: true }];
+      if (table === userModels) return [{ model: modelA }];
+      if (table === modelBackends)
+        return [
+          {
+            id: "backend-1",
+            modelId: "id-a",
+            backendUrl: "http://gpu-1/v1",
+            backendModel: "served-model",
+            backendApiKey: null,
+            isActive: true,
+          },
+          {
+            id: "backend-2",
+            modelId: "id-a",
+            backendUrl: "http://gpu-2/v1",
+            backendModel: "served-model",
+            backendApiKey: null,
+            isActive: true,
+          },
+        ];
+      return [];
+    });
+
+    // gpu-1 serves a 65536 window, gpu-2 only 32768: the safe value is the min.
+    const fetchMock = vi.fn().mockImplementation((url: string) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "served-model",
+                max_model_len: url.includes("gpu-1") ? 65536 : 32768,
+              },
+            ],
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(body.data[0].max_model_len).toBe(32768);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

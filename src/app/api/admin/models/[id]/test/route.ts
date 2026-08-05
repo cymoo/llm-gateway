@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { models } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { models, modelBackends, type ModelBackend } from "@/lib/db/schema";
+import { asc, eq } from "drizzle-orm";
 import {
   getAdminUser,
   unauthorizedResponse,
@@ -12,41 +12,42 @@ type Params = { params: Promise<{ id: string }> };
 
 const TEST_TIMEOUT_MS = parseInt(process.env.MODEL_TEST_TIMEOUT_MS || "15000");
 
-export async function POST(req: NextRequest, { params }: Params) {
-  const admin = await getAdminUser(req);
-  if (!admin) return unauthorizedResponse();
+interface BackendTestResult {
+  backendId: string;
+  backendUrl: string;
+  status: "ok" | "error";
+  latency_ms?: number;
+  message?: string;
+}
 
-  const { id } = await params;
-  const rows = await db.select().from(models).where(eq(models.id, id)).limit(1);
-  if (rows.length === 0) return notFoundResponse("Model not found");
-
-  const model = rows[0];
-
-  // Exercise the model through the same endpoint the proxy forwards to, with a
-  // minimal payload, so the test validates the real request path — backend URL,
-  // backend model id, auth, and endpoint — not merely whether the host is
-  // reachable. A plain `GET /models` ping can't tell a working model from a
-  // wrong model id, and embedding-only backends (TEI, Infinity, etc.) often
-  // don't expose `/models` at all, so that ping 404s even when the model works.
-  const modelType = model.type ?? "chat";
-  const base = model.backendUrl.replace(/\/$/, "");
+// Exercise a backend through the same endpoint the proxy forwards to, with a
+// minimal payload, so the test validates the real request path — backend URL,
+// backend model id, auth, and endpoint — not merely whether the host is
+// reachable. A plain `GET /models` ping can't tell a working model from a
+// wrong model id, and embedding-only backends (TEI, Infinity, etc.) often
+// don't expose `/models` at all, so that ping 404s even when the model works.
+async function testBackend(
+  modelType: string,
+  backend: ModelBackend
+): Promise<BackendTestResult> {
+  const base = backend.backendUrl.replace(/\/$/, "");
 
   let testUrl: string;
   let testBody: Record<string, unknown>;
   if (modelType === "embedding") {
     testUrl = `${base}/embeddings`;
-    testBody = { model: model.backendModel, input: "ping" };
+    testBody = { model: backend.backendModel, input: "ping" };
   } else if (modelType === "rerank") {
     testUrl = `${base}/rerank`;
     testBody = {
-      model: model.backendModel,
+      model: backend.backendModel,
       query: "ping",
       documents: ["ping"],
     };
   } else {
     testUrl = `${base}/chat/completions`;
     testBody = {
-      model: model.backendModel,
+      model: backend.backendModel,
       messages: [{ role: "user", content: "ping" }],
       max_tokens: 1,
       stream: false,
@@ -61,8 +62,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (model.backendApiKey) {
-      headers["Authorization"] = `Bearer ${model.backendApiKey}`;
+    if (backend.backendApiKey) {
+      headers["Authorization"] = `Bearer ${backend.backendApiKey}`;
     }
 
     const res = await fetch(testUrl, {
@@ -75,7 +76,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     const latencyMs = Date.now() - start;
 
     if (res.ok) {
-      return Response.json({ status: "ok", latency_ms: latencyMs });
+      return {
+        backendId: backend.id,
+        backendUrl: backend.backendUrl,
+        status: "ok",
+        latency_ms: latencyMs,
+      };
     }
 
     // Surface a snippet of the backend error so a wrong model id / key / URL is
@@ -84,12 +90,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 200);
-    return Response.json({
+    return {
+      backendId: backend.id,
+      backendUrl: backend.backendUrl,
       status: "error",
       message: `Backend returned ${res.status}${
         res.statusText ? ` ${res.statusText}` : ""
       }${detail ? `: ${detail}` : ""}`,
-    });
+    };
   } catch (err: unknown) {
     clearTimeout(timeoutId);
     const message =
@@ -98,6 +106,50 @@ export async function POST(req: NextRequest, { params }: Params) {
           ? "Connection timeout"
           : err.message
         : "Unknown error";
-    return Response.json({ status: "error", message });
+    return {
+      backendId: backend.id,
+      backendUrl: backend.backendUrl,
+      status: "error",
+      message,
+    };
   }
+}
+
+export async function POST(req: NextRequest, { params }: Params) {
+  const admin = await getAdminUser(req);
+  if (!admin) return unauthorizedResponse();
+
+  const { id } = await params;
+  const rows = await db.select().from(models).where(eq(models.id, id)).limit(1);
+  if (rows.length === 0) return notFoundResponse("Model not found");
+  const model = rows[0];
+
+  // Optional body: { backendId } tests just that backend; otherwise all of the
+  // model's backends (inactive included — admins verify before enabling).
+  let backendIdFilter: string | undefined;
+  try {
+    const body = await req.json();
+    if (body && typeof body.backendId === "string") {
+      backendIdFilter = body.backendId;
+    }
+  } catch {
+    // No/invalid body — test all backends.
+  }
+
+  let backends = await db
+    .select()
+    .from(modelBackends)
+    .where(eq(modelBackends.modelId, id))
+    .orderBy(asc(modelBackends.createdAt), asc(modelBackends.id));
+
+  if (backendIdFilter !== undefined) {
+    backends = backends.filter((b) => b.id === backendIdFilter);
+    if (backends.length === 0) return notFoundResponse("Backend not found");
+  }
+
+  const results = await Promise.all(
+    backends.map((b) => testBackend(model.type ?? "chat", b))
+  );
+
+  return Response.json({ results });
 }

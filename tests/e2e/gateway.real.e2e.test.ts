@@ -111,7 +111,9 @@ async function getTestModels(): Promise<TestModel[]> {
 
   if (provider) {
     params.push(`%${provider}%`);
-    conditions.push(`backend_url ILIKE $${params.length}`);
+    conditions.push(
+      `EXISTS (SELECT 1 FROM model_backends mb WHERE mb.model_id = models.id AND mb.backend_url ILIKE $${params.length})`
+    );
   }
 
   const sql = `

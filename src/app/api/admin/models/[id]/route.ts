@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { models, usageLogs, dailyUsage } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { models, modelBackends, usageLogs, dailyUsage } from "@/lib/db/schema";
+import { asc, eq, inArray } from "drizzle-orm";
 import {
   getAdminUser,
   unauthorizedResponse,
@@ -14,8 +14,17 @@ import {
   validateUrl,
 } from "@/lib/utils/validators";
 import { recordAudit, diff } from "@/lib/audit/recorder";
+import { parseBackendsArray, BackendInput } from "../backends-input";
 
 type Params = { params: Promise<{ id: string }> };
+
+async function getModelBackends(modelId: string) {
+  return db
+    .select()
+    .from(modelBackends)
+    .where(eq(modelBackends.modelId, modelId))
+    .orderBy(asc(modelBackends.createdAt), asc(modelBackends.id));
+}
 
 export async function GET(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);
@@ -24,7 +33,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params;
   const rows = await db.select().from(models).where(eq(models.id, id)).limit(1);
   if (rows.length === 0) return notFoundResponse("Model not found");
-  return Response.json(rows[0]);
+  return Response.json({ ...rows[0], backends: await getModelBackends(id) });
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
@@ -35,11 +44,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const body = await req.json();
 
   if (body.alias && !validateModelAlias(body.alias)) {
-    return Response.json({ error: "Invalid model alias format" }, { status: 400 });
-  }
-
-  if (body.backendUrl && !validateUrl(body.backendUrl)) {
-    return Response.json({ error: "Invalid backendUrl" }, { status: 400 });
+    return Response.json(
+      { error: "Invalid model alias format" },
+      { status: 400 }
+    );
   }
 
   if (body.type !== undefined && !validateModelType(body.type)) {
@@ -53,12 +61,18 @@ export async function PUT(req: NextRequest, { params }: Params) {
     );
   }
 
+  let backendsInput: BackendInput[] | null = null;
+  if (body.backends !== undefined) {
+    const parsed = parseBackendsArray(body.backends);
+    if ("error" in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
+    }
+    backendsInput = parsed.backends;
+  }
+
   const updates: Partial<typeof models.$inferInsert> = {};
   const fields = [
     "alias",
-    "backendUrl",
-    "backendModel",
-    "backendApiKey",
     "type",
     "remark",
     "isActive",
@@ -80,15 +94,118 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .from(models)
     .where(eq(models.id, id))
     .limit(1);
+  if (!beforeModel) return notFoundResponse("Model not found");
+  const beforeBackends = await getModelBackends(id);
+
+  // Legacy single-backend shorthand: flat backend fields update the model's
+  // sole backend. Ambiguous (and rejected) when the model has several.
+  if (
+    backendsInput === null &&
+    (body.backendUrl !== undefined ||
+      body.backendModel !== undefined ||
+      body.backendApiKey !== undefined)
+  ) {
+    if (beforeBackends.length !== 1) {
+      return Response.json(
+        {
+          error:
+            "Model has multiple backends; use the backends array to update them",
+        },
+        { status: 400 }
+      );
+    }
+    if (body.backendUrl !== undefined && !validateUrl(body.backendUrl)) {
+      return Response.json({ error: "Invalid backendUrl" }, { status: 400 });
+    }
+    const single = beforeBackends[0];
+    backendsInput = [
+      {
+        id: single.id,
+        backendUrl: body.backendUrl ?? single.backendUrl,
+        backendModel: body.backendModel ?? single.backendModel,
+        backendApiKey:
+          body.backendApiKey !== undefined
+            ? body.backendApiKey || null
+            : single.backendApiKey,
+        isActive: single.isActive ?? true,
+      },
+    ];
+  }
+
+  // A submitted backend id must reference one of this model's rows; anything
+  // else is a client bug that would otherwise be masked as a fresh insert.
+  if (backendsInput !== null) {
+    const existingIds = new Set(beforeBackends.map((b) => b.id));
+    const unknown = backendsInput.find(
+      (b) => b.id !== undefined && !existingIds.has(b.id)
+    );
+    if (unknown) {
+      return Response.json(
+        { error: `Unknown backend id: ${unknown.id}` },
+        { status: 400 }
+      );
+    }
+  }
 
   try {
-    const [updated] = await db
-      .update(models)
-      .set(updates)
-      .where(eq(models.id, id))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const [model] =
+        Object.keys(updates).length > 0
+          ? await tx
+              .update(models)
+              .set(updates)
+              .where(eq(models.id, id))
+              .returning()
+          : await tx.select().from(models).where(eq(models.id, id)).limit(1);
+
+      if (!model) return null;
+
+      if (backendsInput !== null) {
+        // Reconcile: update rows with a known id, insert rows without one,
+        // delete rows absent from the submitted list.
+        const existingIds = new Set(beforeBackends.map((b) => b.id));
+        const keptIds = new Set(
+          backendsInput
+            .map((b) => b.id)
+            .filter((bid): bid is string => bid !== undefined)
+        );
+        const toDelete = beforeBackends
+          .filter((b) => !keptIds.has(b.id))
+          .map((b) => b.id);
+        if (toDelete.length > 0) {
+          await tx
+            .delete(modelBackends)
+            .where(inArray(modelBackends.id, toDelete));
+        }
+        for (const backend of backendsInput) {
+          if (backend.id && existingIds.has(backend.id)) {
+            await tx
+              .update(modelBackends)
+              .set({
+                backendUrl: backend.backendUrl,
+                backendModel: backend.backendModel,
+                backendApiKey: backend.backendApiKey,
+                isActive: backend.isActive,
+              })
+              .where(eq(modelBackends.id, backend.id));
+          } else {
+            await tx.insert(modelBackends).values({
+              modelId: id,
+              backendUrl: backend.backendUrl,
+              backendModel: backend.backendModel,
+              backendApiKey: backend.backendApiKey,
+              isActive: backend.isActive,
+            });
+          }
+        }
+      }
+
+      return model;
+    });
 
     if (!updated) return notFoundResponse("Model not found");
+
+    const afterBackends = await getModelBackends(id);
 
     recordAudit({
       adminId: admin.userId,
@@ -97,14 +214,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
       resourceType: "model",
       resourceId: updated.id,
       resourceLabel: updated.alias,
-      changes: diff(beforeModel ?? null, updated),
+      changes: diff(
+        { ...beforeModel, backends: beforeBackends },
+        { ...updated, backends: afterBackends }
+      ),
       req,
     });
 
-    return Response.json(updated);
+    return Response.json({ ...updated, backends: afterBackends });
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("unique")) {
-      return Response.json({ error: "Model alias already exists" }, { status: 409 });
+      return Response.json(
+        { error: "Model alias already exists" },
+        { status: 409 }
+      );
     }
     throw err;
   }

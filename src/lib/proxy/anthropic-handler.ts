@@ -1,21 +1,36 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
+import {
+  users,
+  groups,
+  models,
+  userModels,
+  groupModels,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { makeAnthropicError, normalizeAnthropicBackendError } from "./anthropic-errors";
+import {
+  makeAnthropicError,
+  normalizeAnthropicBackendError,
+} from "./anthropic-errors";
 import { checkQuota } from "@/lib/quota/checker";
 import { recordUsage, UsageRecord } from "@/lib/usage/recorder";
+import {
+  anthropicAffinityKey,
+  forwardWithFailover,
+  getActiveBackends,
+  orderBackendsForRequest,
+} from "./backends";
 
 const PROXY_TIMEOUT_NON_STREAM = parseInt(
-  process.env.PROXY_TIMEOUT_NON_STREAM || "300000"
+  process.env.PROXY_TIMEOUT_NON_STREAM || "300000",
 );
 const PROXY_TIMEOUT_STREAM = parseInt(
-  process.env.PROXY_TIMEOUT_STREAM || "600000"
+  process.env.PROXY_TIMEOUT_STREAM || "600000",
 );
 
 export async function handleAnthropicProxy(
   req: NextRequest,
-  remainingPath: string
+  remainingPath: string,
 ): Promise<Response> {
   // 1. Authenticate — Anthropic SDK uses x-api-key header
   let apiKey = req.headers.get("x-api-key")?.trim();
@@ -29,7 +44,7 @@ export async function handleAnthropicProxy(
     return makeAnthropicError(
       "Missing API key (use x-api-key header)",
       "authentication_error",
-      401
+      401,
     );
   }
 
@@ -40,11 +55,7 @@ export async function handleAnthropicProxy(
     .limit(1);
 
   if (userRows.length === 0) {
-    return makeAnthropicError(
-      "Invalid API key",
-      "authentication_error",
-      401
-    );
+    return makeAnthropicError("Invalid API key", "authentication_error", 401);
   }
 
   const user = userRows[0];
@@ -52,7 +63,7 @@ export async function handleAnthropicProxy(
     return makeAnthropicError(
       "User account is disabled",
       "permission_error",
-      403
+      403,
     );
   }
 
@@ -75,11 +86,7 @@ export async function handleAnthropicProxy(
   try {
     body = await req.json();
   } catch {
-    return makeAnthropicError(
-      "Invalid JSON body",
-      "server_error",
-      400
-    );
+    return makeAnthropicError("Invalid JSON body", "server_error", 400);
   }
 
   const modelAlias = body.model as string;
@@ -87,16 +94,18 @@ export async function handleAnthropicProxy(
     return makeAnthropicError(
       "Missing model field in request body",
       "not_found_error",
-      400
+      400,
     );
   }
 
   // Extract prompt preview from messages (Anthropic format)
   let promptPreview: string | null = null;
-  const messages = body.messages as Array<{
-    role?: string;
-    content?: string | Array<{ type?: string; text?: string }>;
-  }> | undefined;
+  const messages = body.messages as
+    | Array<{
+        role?: string;
+        content?: string | Array<{ type?: string; text?: string }>;
+      }>
+    | undefined;
   if (Array.isArray(messages)) {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
@@ -123,7 +132,12 @@ export async function handleAnthropicProxy(
       promptPreview = system;
     } else if (Array.isArray(system)) {
       for (const block of system) {
-        if (block && typeof block === "object" && "text" in block && typeof block.text === "string") {
+        if (
+          block &&
+          typeof block === "object" &&
+          "text" in block &&
+          typeof block.text === "string"
+        ) {
           promptPreview = block.text;
           break;
         }
@@ -148,7 +162,7 @@ export async function handleAnthropicProxy(
     return makeAnthropicError(
       `Model '${modelAlias}' not found`,
       "not_found_error",
-      404
+      404,
     );
   }
 
@@ -163,7 +177,7 @@ export async function handleAnthropicProxy(
       .select()
       .from(userModels)
       .where(
-        and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
+        and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)),
       )
       .limit(1);
     authorized = authRows.length > 0;
@@ -174,8 +188,8 @@ export async function handleAnthropicProxy(
       .where(
         and(
           eq(groupModels.groupId, group.id),
-          eq(groupModels.modelId, model.id)
-        )
+          eq(groupModels.modelId, model.id),
+        ),
       )
       .limit(1);
     authorized = authRows.length > 0;
@@ -185,7 +199,7 @@ export async function handleAnthropicProxy(
     return makeAnthropicError(
       `You are not authorized to use model '${modelAlias}'`,
       "permission_error",
-      403
+      403,
     );
   }
 
@@ -210,21 +224,23 @@ export async function handleAnthropicProxy(
     try {
       const errJson = await quotaError.json();
       errorText = errJson?.error?.message || "";
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     const status = quotaError.status;
     if (status === 429) {
       return makeAnthropicError(
         errorText || "Rate limit exceeded",
         "rate_limit_error",
-        429
+        429,
       );
     }
     if (status === 403) {
       return makeAnthropicError(
         errorText || "Access restricted",
         "permission_error",
-        403
+        403,
       );
     }
     return quotaError;
@@ -234,152 +250,150 @@ export async function handleAnthropicProxy(
   const isStream = body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
-  // Rewrite model field to backend_model
-  const backendBody = { ...body, model: model.backendModel };
-
-  let backendUrlBase = model.backendUrl.replace(/\/$/, "");
-  // The model's backendUrl typically includes /v1 (same as OpenAI base URL).
-  // The Anthropic SDK sends /v1/messages (remainingPath = "v1/messages").
-  // To avoid double /v1: strip it from backendUrl. Final: {base}/v1/messages.
-  if (backendUrlBase.endsWith("/v1") && remainingPath.startsWith("v1/")) {
-    backendUrlBase = backendUrlBase.replace(/\/v1$/, "");
+  const backends = orderBackendsForRequest(
+    model.id,
+    await getActiveBackends(model.id),
+    anthropicAffinityKey(body),
+  );
+  if (backends.length === 0) {
+    return makeAnthropicError(
+      `Model '${modelAlias}' has no active backends`,
+      "server_error",
+      503,
+    );
   }
-  const backendUrl = `${backendUrlBase}/${remainingPath}`;
 
-  const headers = buildForwardHeaders(apiKey, model.backendApiKey ?? undefined);
-  forwardAnthropicHeaders(req, headers);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const backendResponse = await fetch(backendUrl, {
-      method: req.method,
-      headers,
-      body: JSON.stringify(backendBody),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!backendResponse.ok) {
-      const backendErrorText = await backendResponse.text();
-      const normalizedError = normalizeAnthropicBackendError(
-        backendErrorText,
-        backendResponse.status
-      );
-      if (normalizedError) {
-        return normalizedError;
+  const outcome = await forwardWithFailover({
+    backends,
+    timeoutMs: timeout,
+    buildRequest: (backend) => {
+      let backendUrlBase = backend.backendUrl.replace(/\/$/, "");
+      // The backend URL typically includes /v1 (same as OpenAI base URL).
+      // The Anthropic SDK sends /v1/messages (remainingPath = "v1/messages").
+      // To avoid double /v1: strip it from the URL. Final: {base}/v1/messages.
+      if (backendUrlBase.endsWith("/v1") && remainingPath.startsWith("v1/")) {
+        backendUrlBase = backendUrlBase.replace(/\/v1$/, "");
       }
-
-      return new Response(backendErrorText, {
-        status: backendResponse.status,
-        headers: {
-          "Content-Type":
-            backendResponse.headers.get("content-type") || "application/json",
+      const headers = buildForwardHeaders(
+        apiKey,
+        backend.backendApiKey ?? undefined,
+      );
+      forwardAnthropicHeaders(req, headers);
+      return {
+        url: `${backendUrlBase}/${remainingPath}`,
+        init: {
+          method: req.method,
+          headers,
+          body: JSON.stringify({ ...body, model: backend.backendModel }),
         },
-      });
+      };
+    },
+  });
+
+  if (outcome.kind === "timeout") {
+    return makeAnthropicError("Request timed out", "server_error", 504);
+  }
+  if (outcome.kind === "network_error") {
+    return makeAnthropicError("Backend is unavailable", "server_error", 502);
+  }
+  if (outcome.kind === "http_error") {
+    const normalizedError = normalizeAnthropicBackendError(
+      outcome.text,
+      outcome.status,
+    );
+    if (normalizedError) {
+      return normalizedError;
+    }
+    return new Response(outcome.text, {
+      status: outcome.status,
+      headers: {
+        "Content-Type": outcome.contentType || "application/json",
+      },
+    });
+  }
+
+  const backendResponse = outcome.response;
+
+  if (isStream) {
+    if (!backendResponse.body) {
+      return makeAnthropicError(
+        "Backend returned empty response",
+        "server_error",
+        502,
+      );
     }
 
-    if (isStream) {
-      if (!backendResponse.body) {
-        return makeAnthropicError(
-          "Backend returned empty response",
-          "server_error",
-          502
-        );
-      }
+    let streamUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    };
 
-      let streamUsage = {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      };
-
-      const transformer = createAnthropicStreamTransformer((usage) => {
-        streamUsage = usage;
-        const durationMs = Date.now() - startTime;
-        recordUsage({
-          userId: user.id,
-          modelId: model.id,
-          requestType: "chat.completions",
-          ...usage,
-          isStream: true,
-          durationMs,
-          status: "success",
-          promptPreview,
-          clientIp,
-        } as UsageRecord);
-      });
-
-      const transformedStream = backendResponse.body.pipeThrough(transformer);
-
-      return new Response(transformedStream, {
-        status: backendResponse.status,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    } else {
-      // Non-streaming response
-      const responseText = await backendResponse.text();
+    const transformer = createAnthropicStreamTransformer((usage) => {
+      streamUsage = usage;
       const durationMs = Date.now() - startTime;
-
-      let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      try {
-        const json = JSON.parse(responseText);
-        if (json.usage) {
-          usage = {
-            promptTokens: json.usage.input_tokens || 0,
-            completionTokens: json.usage.output_tokens || 0,
-            totalTokens:
-              (json.usage.input_tokens || 0) +
-              (json.usage.output_tokens || 0),
-          };
-        }
-      } catch {
-        // Ignore parse errors
-      }
-
       recordUsage({
         userId: user.id,
         modelId: model.id,
         requestType: "chat.completions",
         ...usage,
-        isStream: false,
+        isStream: true,
         durationMs,
         status: "success",
         promptPreview,
         clientIp,
       } as UsageRecord);
+    });
 
-      return new Response(responseText, {
-        status: backendResponse.status,
-        headers: {
-          "Content-Type":
-            backendResponse.headers.get("content-type") || "application/json",
-        },
-      });
+    const transformedStream = backendResponse.body.pipeThrough(transformer);
+
+    return new Response(transformedStream, {
+      status: backendResponse.status,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } else {
+    // Non-streaming response
+    const responseText = await backendResponse.text();
+    const durationMs = Date.now() - startTime;
+
+    let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    try {
+      const json = JSON.parse(responseText);
+      if (json.usage) {
+        usage = {
+          promptTokens: json.usage.input_tokens || 0,
+          completionTokens: json.usage.output_tokens || 0,
+          totalTokens:
+            (json.usage.input_tokens || 0) + (json.usage.output_tokens || 0),
+        };
+      }
+    } catch {
+      // Ignore parse errors
     }
-  } catch (err: unknown) {
-    clearTimeout(timeoutId);
 
-    if (err instanceof Error && err.name === "AbortError") {
-      return makeAnthropicError(
-        "Request timed out",
-        "server_error",
-        504
-      );
-    }
+    recordUsage({
+      userId: user.id,
+      modelId: model.id,
+      requestType: "chat.completions",
+      ...usage,
+      isStream: false,
+      durationMs,
+      status: "success",
+      promptPreview,
+      clientIp,
+    } as UsageRecord);
 
-    console.error("[anthropic-proxy] Backend error:", err);
-    return makeAnthropicError(
-      "Backend is unavailable",
-      "server_error",
-      502
-    );
+    return new Response(responseText, {
+      status: backendResponse.status,
+      headers: {
+        "Content-Type":
+          backendResponse.headers.get("content-type") || "application/json",
+      },
+    });
   }
 }
 
@@ -387,7 +401,7 @@ export async function handleAnthropicProxy(
 
 function buildForwardHeaders(
   apiKey: string,
-  backendApiKey?: string
+  backendApiKey?: string,
 ): Record<string, string> {
   const key = backendApiKey ?? apiKey;
   return {
@@ -399,7 +413,7 @@ function buildForwardHeaders(
 
 function forwardAnthropicHeaders(
   req: NextRequest,
-  headers: Record<string, string>
+  headers: Record<string, string>,
 ): void {
   const anthropicVersion = req.headers.get("anthropic-version");
   if (anthropicVersion) {
@@ -425,7 +439,7 @@ interface StreamUsage {
  * Also handles OpenAI-format SSE chunks for compatibility.
  */
 function createAnthropicStreamTransformer(
-  onComplete: (usage: StreamUsage) => void
+  onComplete: (usage: StreamUsage) => void,
 ): TransformStream<Uint8Array, Uint8Array> {
   let buffer = "";
   let lastUsage: StreamUsage = {
@@ -446,13 +460,15 @@ function createAnthropicStreamTransformer(
       // Anthropic message_start: contains usage.input_tokens
       if (parsed.type === "message_start" && parsed.message?.usage) {
         lastUsage.promptTokens = parsed.message.usage.input_tokens || 0;
-        lastUsage.totalTokens = lastUsage.promptTokens + lastUsage.completionTokens;
+        lastUsage.totalTokens =
+          lastUsage.promptTokens + lastUsage.completionTokens;
       }
 
       // Anthropic message_delta: contains usage.output_tokens
       if (parsed.type === "message_delta" && parsed.usage) {
         lastUsage.completionTokens = parsed.usage.output_tokens || 0;
-        lastUsage.totalTokens = lastUsage.promptTokens + lastUsage.completionTokens;
+        lastUsage.totalTokens =
+          lastUsage.promptTokens + lastUsage.completionTokens;
       }
 
       // OpenAI-format usage (for vllm compatibility)

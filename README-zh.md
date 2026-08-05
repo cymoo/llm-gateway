@@ -3,6 +3,7 @@
 一个基于 **Next.js 16** + **Drizzle ORM** + **PostgreSQL** 的 LLM 网关项目，提供：
 
 - 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`、`completions`、`embeddings`、`rerank`）
+- 单个模型可挂多台上游后端，缓存亲和负载均衡 + 自动故障切换
 - 公开自助注册（`/register`）+ 管理员审批流程
 - 用户与模型权限管理
 - 用户/模型配额与限流控制
@@ -49,6 +50,9 @@ JWT_SECRET=replace-with-a-long-random-secret
 # 代理超时（毫秒，可选）
 PROXY_TIMEOUT_NON_STREAM=300000
 PROXY_TIMEOUT_STREAM=600000
+
+# 可选：多后端缓存亲和路由的对话首部哈希长度上限
+AFFINITY_PREFIX_LENGTH=16384
 ```
 
 ### 3) 初始化数据库

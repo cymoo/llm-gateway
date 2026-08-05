@@ -133,10 +133,7 @@ CREATE TABLE users (
 CREATE TABLE models (
     id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     alias                           VARCHAR(100) UNIQUE NOT NULL,   -- 用户可见的模型名
-    backend_url                     VARCHAR(500) NOT NULL,          -- 如 http://ip1:port1/v1
-    backend_model                   VARCHAR(200) NOT NULL,          -- 真实模型名
-    backend_api_key                 VARCHAR(200),                   -- 后端 API Key（可选）
-    type                            VARCHAR(20) NOT NULL DEFAULT 'chat', -- 'chat' | 'embedding'
+    type                            VARCHAR(20) NOT NULL DEFAULT 'chat', -- 'chat' | 'embedding' | 'rerank'
     is_active                       BOOLEAN DEFAULT true,
 
     -- 默认限额模板（新用户授权时自动继承）
@@ -148,6 +145,24 @@ CREATE TABLE models (
 
     created_at                      TIMESTAMPTZ DEFAULT now()
 );
+
+-- ============================================
+-- 模型后端（一个模型别名 → N 台上游服务器）
+-- ============================================
+-- 同一模型部署在多台 vLLM 服务器上时，在同一别名下挂多行后端。
+-- 代理层做负载均衡：chat/completions 按对话前缀哈希做缓存亲和路由
+--（同一对话固定落在同一台后端，命中 vLLM 前缀缓存），
+-- embeddings/rerank 轮询；后端连接失败或返回 5xx/429 时自动切换下一台。
+CREATE TABLE model_backends (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    model_id        UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    backend_url     VARCHAR(500) NOT NULL,   -- 如 http://ip1:port1/v1
+    backend_model   VARCHAR(200) NOT NULL,   -- 该后端的真实模型名（各后端可不同）
+    backend_api_key VARCHAR(200),            -- 后端 API Key（可选）
+    is_active       BOOLEAN DEFAULT true,
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_model_backends_model_id ON model_backends(model_id);
 
 -- ============================================
 -- 用户-模型授权（多对多）

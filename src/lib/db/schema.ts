@@ -56,9 +56,6 @@ export const models = pgTable(
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
     alias: varchar("alias", { length: 100 }).unique().notNull(),
-    backendUrl: varchar("backend_url", { length: 500 }).notNull(),
-    backendModel: varchar("backend_model", { length: 200 }).notNull(),
-    backendApiKey: varchar("backend_api_key", { length: 200 }),
     type: varchar("type", { length: 20 }).notNull().default("chat"),
     remark: varchar("remark", { length: 1000 }),
     isActive: boolean("is_active").default(true),
@@ -74,6 +71,24 @@ export const models = pgTable(
     ),
   },
   (table) => [index("idx_models_alias").on(table.alias)]
+);
+
+export const modelBackends = pgTable(
+  "model_backends",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    modelId: uuid("model_id")
+      .notNull()
+      .references(() => models.id, { onDelete: "cascade" }),
+    backendUrl: varchar("backend_url", { length: 500 }).notNull(),
+    backendModel: varchar("backend_model", { length: 200 }).notNull(),
+    backendApiKey: varchar("backend_api_key", { length: 200 }),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).default(
+      sql`now()`
+    ),
+  },
+  (table) => [index("idx_model_backends_model_id").on(table.modelId)]
 );
 
 export const userModels = pgTable(
@@ -243,6 +258,8 @@ export type GroupModelQuota = typeof groupModelQuotas.$inferSelect;
 export type NewGroupModelQuota = typeof groupModelQuotas.$inferInsert;
 export type Model = typeof models.$inferSelect;
 export type NewModel = typeof models.$inferInsert;
+export type ModelBackend = typeof modelBackends.$inferSelect;
+export type NewModelBackend = typeof modelBackends.$inferInsert;
 export type UserModel = typeof userModels.$inferSelect;
 export type UserModelQuota = typeof userModelQuotas.$inferSelect;
 export type NewUserModelQuota = typeof userModelQuotas.$inferInsert;

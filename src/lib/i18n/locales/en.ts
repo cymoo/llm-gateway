@@ -242,6 +242,12 @@ const en = {
       "Only lowercase letters, digits, hyphens. Cannot start/end with hyphen.",
     backendUrlLabel: "Backend URL",
     backendModelName: "Backend Model Name",
+    backends: "Backends",
+    backendsHint:
+      "Multiple backends serving the same model are load-balanced with automatic failover.",
+    backendLabel: "Backend {n}",
+    addBackend: "Add Backend",
+    backendsOk: "{ok}/{total} backends OK",
     modelType: "Model Type",
     typeChat: "Chat / Completions",
     typeEmbedding: "Embedding",

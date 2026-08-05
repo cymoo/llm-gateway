@@ -24,27 +24,53 @@ vi.mock("@/lib/usage/recorder", () => ({
 }));
 
 import { handleProxy } from "./handler";
+import { _resetRoundRobin } from "./backends";
+
+// Queue-based drizzle mock. Auth/model/authorization queries resolve at
+// `.limit()`; the model_backends query resolves at `.orderBy()`.
+function setupDb(results: unknown[][]) {
+  let i = 0;
+  const next = () => Promise.resolve(results[i++] ?? []);
+  mockSelect.mockImplementation(() => ({
+    from: () => ({
+      where: () => ({
+        limit: next,
+        orderBy: next,
+      }),
+    }),
+  }));
+}
+
+function chatQueue(
+  modelRow: Record<string, unknown>,
+  backends: Record<string, unknown>[]
+) {
+  return [
+    [{ id: "user-1", isActive: true, groupId: "group-default" }],
+    [{ id: "group-default", isDefault: true }],
+    [modelRow],
+    [{ userId: "user-1", modelId: "model-1" }],
+    backends,
+  ];
+}
+
+const defaultBackend = {
+  id: "backend-1",
+  modelId: "model-1",
+  backendUrl: "http://backend",
+  backendModel: "gpt-backend",
+  backendApiKey: null,
+  isActive: true,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+};
 
 describe("handleProxy prompt preview", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetRoundRobin();
     mockCheckQuota.mockResolvedValue(null);
 
-    let limitCallIndex = 0;
-    const limitResults = [
-      [{ id: "user-1", isActive: true, groupId: "group-default" }],
-      [{ id: "group-default", isDefault: true }],
-      [{ id: "model-1", alias: "gpt-test", backendUrl: "http://backend", backendModel: "gpt-backend" }],
-      [{ userId: "user-1", modelId: "model-1" }],
-    ];
-
-    mockSelect.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(limitResults[limitCallIndex++]),
-        }),
-      }),
-    }));
+    setupDb(chatQueue({ id: "model-1", alias: "gpt-test" }, [defaultBackend]));
 
     vi.stubGlobal(
       "fetch",
@@ -90,35 +116,196 @@ describe("handleProxy prompt preview", () => {
   });
 });
 
-describe("handleProxy embeddings", () => {
-  function setupDb(modelRow: Record<string, unknown>) {
-    let i = 0;
-    const results = [
-      [{ id: "user-1", isActive: true, groupId: "group-default" }],
-      [{ id: "group-default", isDefault: true }],
-      [modelRow],
-      [{ userId: "user-1", modelId: "model-1" }],
-    ];
-    mockSelect.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(results[i++]),
-        }),
+describe("handleProxy multi-backend", () => {
+  const backend1 = {
+    ...defaultBackend,
+    id: "backend-1",
+    backendUrl: "http://backend-1",
+    backendModel: "served-1",
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+  };
+  const backend2 = {
+    ...defaultBackend,
+    id: "backend-2",
+    backendUrl: "http://backend-2",
+    backendModel: "served-2",
+    createdAt: new Date("2026-01-02T00:00:00Z"),
+  };
+
+  const req = () => ({
+    headers: new Headers({ authorization: "Bearer test-key" }),
+    json: async () => ({
+      model: "gpt-test",
+      messages: [{ role: "user", content: "hi" }],
+      stream: false,
+    }),
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetRoundRobin();
+    mockCheckQuota.mockResolvedValue(null);
+  });
+
+  it("returns 503 when the model has no active backends", async () => {
+    setupDb(chatQueue({ id: "model-1", alias: "gpt-test" }, []));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleProxy(req() as never, "chat.completions");
+    expect(res.status).toBe(503);
+    const body = await res.json();
+    expect(body.error.code).toBe("backend_unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(mockRecordUsage).not.toHaveBeenCalled();
+  });
+
+  it("fails over to the other backend on 5xx and records usage once", async () => {
+    setupDb(
+      chatQueue({ id: "model-1", alias: "gpt-test" }, [backend1, backend2])
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("boom", { status: 500 }))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            usage: { prompt_tokens: 1, completion_tokens: 2, total_tokens: 3 },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleProxy(req() as never, "chat.completions");
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const urls = fetchMock.mock.calls.map((c) => c[0] as string);
+    expect(new Set(urls).size).toBe(2);
+    // The forwarded body carries each backend's own served model id.
+    const bodies = fetchMock.mock.calls.map((c) =>
+      JSON.parse(c[1].body as string)
+    );
+    expect(new Set(bodies.map((b) => b.model)).size).toBe(2);
+    expect(mockRecordUsage).toHaveBeenCalledTimes(1);
+    expect(mockRecordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: "model-1", totalTokens: 3 })
+    );
+  });
+
+  it("does not fail over on a 4xx client error", async () => {
+    setupDb(
+      chatQueue({ id: "model-1", alias: "gpt-test" }, [backend1, backend2])
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: "bad" } }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await handleProxy(req() as never, "chat.completions");
+    expect(res.status).toBe(400);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails over for streamed requests when the failure precedes streaming", async () => {
+    setupDb(
+      chatQueue({ id: "model-1", alias: "gpt-test" }, [backend1, backend2])
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("boom", { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response("data: [DONE]\n\n", {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const streamReq = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({
+        model: "gpt-test",
+        messages: [{ role: "user", content: "hi" }],
+        stream: true,
       }),
-    }));
+    };
+
+    const res = await handleProxy(streamReq as never, "chat.completions");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await res.text();
+  });
+
+  it("keeps a conversation on the same backend across turns (affinity)", async () => {
+    const fetchOk = () =>
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ usage: { total_tokens: 1 } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    const system = { role: "system", content: "You are helpful." };
+    const u1 = { role: "user", content: "first question" };
+
+    const turnReq = (messages: unknown[]) => ({
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({ model: "gpt-test", messages, stream: false }),
+    });
+
+    setupDb(
+      chatQueue({ id: "model-1", alias: "gpt-test" }, [backend1, backend2])
+    );
+    const fetch1 = fetchOk();
+    vi.stubGlobal("fetch", fetch1);
+    await handleProxy(turnReq([system, u1]) as never, "chat.completions");
+
+    setupDb(
+      chatQueue({ id: "model-1", alias: "gpt-test" }, [backend1, backend2])
+    );
+    const fetch2 = fetchOk();
+    vi.stubGlobal("fetch", fetch2);
+    await handleProxy(
+      turnReq([
+        system,
+        u1,
+        { role: "assistant", content: "answer" },
+        { role: "user", content: "follow-up" },
+      ]) as never,
+      "chat.completions"
+    );
+
+    expect(fetch1.mock.calls[0][0]).toBe(fetch2.mock.calls[0][0]);
+  });
+});
+
+describe("handleProxy embeddings", () => {
+  function setupEmbeddings(
+    modelRow: Record<string, unknown>,
+    backends: Record<string, unknown>[] = [
+      { ...defaultBackend, backendModel: "bge-backend" },
+    ]
+  ) {
+    setupDb(chatQueue(modelRow, backends));
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetRoundRobin();
     mockCheckQuota.mockResolvedValue(null);
   });
 
   it("proxies to /embeddings and records prompt-only usage", async () => {
-    setupDb({
+    setupEmbeddings({
       id: "model-1",
       alias: "embed-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-backend",
       type: "embedding",
     });
     const fetchMock = vi.fn().mockResolvedValue(
@@ -153,11 +340,9 @@ describe("handleProxy embeddings", () => {
   });
 
   it("treats a spurious stream:true on embeddings as non-streaming", async () => {
-    setupDb({
+    setupEmbeddings({
       id: "model-1",
       alias: "embed-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-backend",
       type: "embedding",
     });
     const fetchMock = vi.fn().mockResolvedValue(
@@ -196,11 +381,9 @@ describe("handleProxy embeddings", () => {
   });
 
   it("rejects an embeddings request against a chat model", async () => {
-    setupDb({
+    setupEmbeddings({
       id: "model-1",
       alias: "gpt-test",
-      backendUrl: "http://backend",
-      backendModel: "gpt-backend",
       type: "chat",
     });
     const fetchMock = vi.fn();
@@ -220,11 +403,9 @@ describe("handleProxy embeddings", () => {
   });
 
   it("rejects a chat request against an embedding model", async () => {
-    setupDb({
+    setupEmbeddings({
       id: "model-1",
       alias: "embed-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-backend",
       type: "embedding",
     });
     const fetchMock = vi.fn();
@@ -247,34 +428,25 @@ describe("handleProxy embeddings", () => {
 });
 
 describe("handleProxy rerank", () => {
-  function setupDb(modelRow: Record<string, unknown>) {
-    let i = 0;
-    const results = [
-      [{ id: "user-1", isActive: true, groupId: "group-default" }],
-      [{ id: "group-default", isDefault: true }],
-      [modelRow],
-      [{ userId: "user-1", modelId: "model-1" }],
-    ];
-    mockSelect.mockImplementation(() => ({
-      from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve(results[i++]),
-        }),
-      }),
-    }));
+  function setupRerank(
+    modelRow: Record<string, unknown>,
+    backends: Record<string, unknown>[] = [
+      { ...defaultBackend, backendModel: "bge-reranker-backend" },
+    ]
+  ) {
+    setupDb(chatQueue(modelRow, backends));
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
+    _resetRoundRobin();
     mockCheckQuota.mockResolvedValue(null);
   });
 
   it("proxies to /rerank and records prompt-only usage from the query", async () => {
-    setupDb({
+    setupRerank({
       id: "model-1",
       alias: "rerank-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-reranker-backend",
       type: "rerank",
     });
     const fetchMock = vi.fn().mockResolvedValue(
@@ -319,11 +491,9 @@ describe("handleProxy rerank", () => {
   });
 
   it("treats a spurious stream:true on rerank as non-streaming", async () => {
-    setupDb({
+    setupRerank({
       id: "model-1",
       alias: "rerank-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-reranker-backend",
       type: "rerank",
     });
     const fetchMock = vi.fn().mockResolvedValue(
@@ -363,11 +533,9 @@ describe("handleProxy rerank", () => {
   });
 
   it("rejects a rerank request against a chat model", async () => {
-    setupDb({
+    setupRerank({
       id: "model-1",
       alias: "gpt-test",
-      backendUrl: "http://backend",
-      backendModel: "gpt-backend",
       type: "chat",
     });
     const fetchMock = vi.fn();
@@ -387,11 +555,9 @@ describe("handleProxy rerank", () => {
   });
 
   it("rejects a chat request against a rerank model", async () => {
-    setupDb({
+    setupRerank({
       id: "model-1",
       alias: "rerank-test",
-      backendUrl: "http://backend",
-      backendModel: "bge-reranker-backend",
       type: "rerank",
     });
     const fetchMock = vi.fn();

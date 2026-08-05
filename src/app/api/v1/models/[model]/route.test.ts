@@ -5,7 +5,14 @@ const { mockSelect } = vi.hoisted(() => ({ mockSelect: vi.fn() }));
 vi.mock("@/lib/db", () => ({ db: { select: mockSelect } }));
 
 import { GET } from "./route";
-import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
+import {
+  users,
+  groups,
+  models,
+  modelBackends,
+  userModels,
+  groupModels,
+} from "@/lib/db/schema";
 import { _resetContextWindowCache } from "@/lib/proxy/context-window";
 
 // Chainable drizzle mock that routes results by the table passed to `.from()`.
@@ -16,6 +23,7 @@ function setupDb(resolver: (table: unknown) => unknown[]) {
       from: (t: unknown) => ((table = t), c),
       where: () => c,
       limit: () => Promise.resolve(resolver(table)),
+      orderBy: () => Promise.resolve(resolver(table)),
       then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
         Promise.resolve(resolver(table)).then(onF, onR),
     };
@@ -27,8 +35,16 @@ const model = {
   id: "id-a",
   alias: "model-a",
   isActive: true,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+};
+
+const backendRow = {
+  id: "backend-1",
+  modelId: "id-a",
   backendUrl: "http://backend/v1",
   backendModel: "backend-a",
+  backendApiKey: null,
+  isActive: true,
   createdAt: new Date("2026-01-01T00:00:00Z"),
 };
 
@@ -53,6 +69,7 @@ describe("GET /api/v1/models/[model]", () => {
       // Not in the group, but present in the user's personal list.
       if (table === groupModels) return [];
       if (table === userModels) return [{ userId: "user-1", modelId: "id-a" }];
+      if (table === modelBackends) return [backendRow];
       return [];
     });
     vi.stubGlobal(

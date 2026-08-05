@@ -6,7 +6,12 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { ModelFormComponent } from "../new/page";
+import {
+  ModelFormComponent,
+  backendsPayload,
+  type ModelForm,
+  type BackendForm,
+} from "../new/page";
 import { useLanguage } from "@/lib/i18n";
 
 export default function ModelDetailPage() {
@@ -16,35 +21,47 @@ export default function ModelDetailPage() {
   const { t } = useLanguage();
   const modelId = params.id as string;
 
-  const [initialForm, setInitialForm] = useState<{
-    alias: string;
-    backendUrl: string;
-    backendModel: string;
-    type: string;
-    backendApiKey: string;
-    remark: string;
-    isActive: boolean;
-    defaultMaxTokensPerDay: string;
-    defaultMaxRequestsPerDay: string;
-    defaultMaxRequestsPerMin: string;
-    defaultAllowedTimeStart: string;
-    defaultAllowedTimeEnd: string;
-  } | null>(null);
+  const [initialForm, setInitialForm] = useState<ModelForm | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
-  const [testLoading, setTestLoading] = useState(false);
+  const [testingBackendId, setTestingBackendId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/admin/models/${modelId}`)
       .then((r) => r.json())
       .then((data) => {
+        const backends: BackendForm[] = Array.isArray(data.backends)
+          ? data.backends.map(
+              (b: {
+                id: string;
+                backendUrl: string;
+                backendModel: string;
+                backendApiKey: string | null;
+                isActive: boolean | null;
+              }) => ({
+                id: b.id,
+                backendUrl: b.backendUrl || "",
+                backendModel: b.backendModel || "",
+                backendApiKey: b.backendApiKey || "",
+                isActive: b.isActive ?? true,
+              })
+            )
+          : [];
         setInitialForm({
           alias: data.alias || "",
-          backendUrl: data.backendUrl || "",
-          backendModel: data.backendModel || "",
           type: data.type || "chat",
-          backendApiKey: data.backendApiKey || "",
+          backends:
+            backends.length > 0
+              ? backends
+              : [
+                  {
+                    backendUrl: "",
+                    backendModel: "",
+                    backendApiKey: "",
+                    isActive: true,
+                  },
+                ],
           remark: data.remark || "",
           isActive: data.isActive ?? true,
           defaultMaxTokensPerDay: data.defaultMaxTokensPerDay?.toString() || "",
@@ -57,16 +74,14 @@ export default function ModelDetailPage() {
       .finally(() => setFetchLoading(false));
   }, [modelId]);
 
-  const handleSubmit = async (form: typeof initialForm) => {
-    if (!form) return;
+  const handleSubmit = async (form: ModelForm) => {
     setLoading(true);
     setError("");
     try {
       const body: Record<string, unknown> = {
         alias: form.alias,
-        backendUrl: form.backendUrl,
-        backendModel: form.backendModel,
         type: form.type,
+        backends: backendsPayload(form.backends),
         remark: form.remark || null,
         isActive: form.isActive,
         defaultMaxTokensPerDay: form.defaultMaxTokensPerDay
@@ -81,7 +96,6 @@ export default function ModelDetailPage() {
         defaultAllowedTimeStart: form.defaultAllowedTimeStart || null,
         defaultAllowedTimeEnd: form.defaultAllowedTimeEnd || null,
       };
-      if (form.backendApiKey) body.backendApiKey = form.backendApiKey;
 
       const res = await fetch(`/api/admin/models/${modelId}`, {
         method: "PUT",
@@ -101,24 +115,27 @@ export default function ModelDetailPage() {
     }
   };
 
-  const handleTest = async () => {
-    setTestLoading(true);
+  const handleTestBackend = async (backendId: string) => {
+    setTestingBackendId(backendId);
     try {
       const res = await fetch(`/api/admin/models/${modelId}/test`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ backendId }),
       });
       const data = await res.json();
-      if (data.status === "ok") {
-        toast({ title: t("models.connected", { ms: data.latency_ms }) });
+      const result = data.results?.[0];
+      if (result?.status === "ok") {
+        toast({ title: t("models.connected", { ms: result.latency_ms }) });
       } else {
         toast({
           title: t("models.connectionFailed"),
-          description: data.message,
+          description: result?.message ?? data.error,
           variant: "destructive",
         });
       }
     } finally {
-      setTestLoading(false);
+      setTestingBackendId(null);
     }
   };
 
@@ -151,8 +168,8 @@ export default function ModelDetailPage() {
         loading={loading}
         error={error}
         modelId={modelId}
-        onTest={handleTest}
-        testLoading={testLoading}
+        onTestBackend={handleTestBackend}
+        testingBackendId={testingBackendId}
       />
     </div>
   );
