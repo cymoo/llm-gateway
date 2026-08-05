@@ -1,24 +1,33 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
+import {
+  users,
+  groups,
+  models,
+  userModels,
+  groupModels,
+} from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { makeProxyError, normalizeBackendError } from "./errors";
 import { checkQuota } from "@/lib/quota/checker";
 import { recordUsage } from "@/lib/usage/recorder";
 import { createStreamTransformer } from "./stream";
+import {
+  affinityKey,
+  forwardWithFailover,
+  getActiveBackends,
+  orderBackendsForRequest,
+} from "./backends";
 
 const PROXY_TIMEOUT_NON_STREAM = parseInt(
-  process.env.PROXY_TIMEOUT_NON_STREAM || "300000"
+  process.env.PROXY_TIMEOUT_NON_STREAM || "300000",
 );
 const PROXY_TIMEOUT_STREAM = parseInt(
-  process.env.PROXY_TIMEOUT_STREAM || "600000"
+  process.env.PROXY_TIMEOUT_STREAM || "600000",
 );
 
 export type RequestType =
-  | "chat.completions"
-  | "completions"
-  | "embeddings"
-  | "rerank";
+  "chat.completions" | "completions" | "embeddings" | "rerank";
 
 // Model `type` required by each request endpoint. The endpoint and the model's
 // declared type must match; rows without an explicit type default to "chat".
@@ -43,7 +52,7 @@ const NON_STREAMING_TYPES = new Set<RequestType>(["embeddings", "rerank"]);
 
 export async function handleProxy(
   req: NextRequest,
-  requestType: RequestType
+  requestType: RequestType,
 ): Promise<Response> {
   const startTime = Date.now();
 
@@ -54,7 +63,7 @@ export async function handleProxy(
       "Missing or invalid Authorization header",
       "authentication_error",
       "invalid_api_key",
-      401
+      401,
     );
   }
   const apiKey = authHeader.slice(7).trim();
@@ -70,7 +79,7 @@ export async function handleProxy(
       "Invalid API key",
       "authentication_error",
       "invalid_api_key",
-      401
+      401,
     );
   }
 
@@ -80,7 +89,7 @@ export async function handleProxy(
       "User account is disabled",
       "authentication_error",
       "user_disabled",
-      403
+      403,
     );
   }
 
@@ -104,7 +113,7 @@ export async function handleProxy(
       "Invalid JSON body",
       "server_error",
       "backend_unavailable",
-      400
+      400,
     );
   }
 
@@ -114,7 +123,7 @@ export async function handleProxy(
       "Missing model field in request body",
       "not_found_error",
       "model_not_found",
-      400
+      400,
     );
   }
 
@@ -135,8 +144,7 @@ export async function handleProxy(
     }
   } else {
     const messages = body.messages as
-      | Array<{ role?: string; content?: string }>
-      | undefined;
+      Array<{ role?: string; content?: string }> | undefined;
     if (Array.isArray(messages)) {
       for (let i = messages.length - 1; i >= 0; i--) {
         const messageContent = messages[i].content;
@@ -166,7 +174,7 @@ export async function handleProxy(
       `Model '${modelAlias}' not found`,
       "not_found_error",
       "model_not_found",
-      404
+      404,
     );
   }
 
@@ -182,7 +190,7 @@ export async function handleProxy(
       `Model '${modelAlias}' does not support the ${SUFFIX[requestType]} endpoint`,
       "not_found_error",
       "model_type_mismatch",
-      404
+      404,
     );
   }
 
@@ -196,7 +204,7 @@ export async function handleProxy(
       .select()
       .from(userModels)
       .where(
-        and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
+        and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)),
       )
       .limit(1);
     authorized = authRows.length > 0;
@@ -209,8 +217,8 @@ export async function handleProxy(
       .where(
         and(
           eq(groupModels.groupId, group.id),
-          eq(groupModels.modelId, model.id)
-        )
+          eq(groupModels.modelId, model.id),
+        ),
       )
       .limit(1);
 
@@ -223,7 +231,7 @@ export async function handleProxy(
         .select()
         .from(userModels)
         .where(
-          and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id))
+          and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)),
         )
         .limit(1);
       authorized = userAuthRows.length > 0;
@@ -236,7 +244,7 @@ export async function handleProxy(
       `You are not authorized to use model '${modelAlias}'`,
       "permission_error",
       "model_not_allowed",
-      403
+      403,
     );
   }
 
@@ -259,171 +267,172 @@ export async function handleProxy(
   // Embeddings and rerank are always non-streaming; ignore a spurious
   // `stream: true` so the response is proxied as JSON and token usage is
   // accounted correctly.
-  const isStream = !NON_STREAMING_TYPES.has(requestType) && body.stream === true;
+  const isStream =
+    !NON_STREAMING_TYPES.has(requestType) && body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
-  // Rewrite model field to backend_model.
-  const backendBody: Record<string, unknown> = {
-    ...body,
-    model: model.backendModel,
-  };
+  // Body minus the model field; each backend sets its own backend_model.
+  const backendBodyBase: Record<string, unknown> = { ...body };
   if (NON_STREAMING_TYPES.has(requestType)) {
     // Non-streaming endpoints never forward streaming controls, even if the
     // client sent them, so the upstream doesn't reject the request.
-    delete backendBody.stream;
-    delete backendBody.stream_options;
+    delete backendBodyBase.stream;
+    delete backendBodyBase.stream_options;
   } else if (isStream) {
     // Inject stream_options.include_usage so the backend emits a final usage
     // chunk; otherwise streamed requests record 0 tokens.
-    backendBody.stream_options = {
+    backendBodyBase.stream_options = {
       ...(body.stream_options as Record<string, unknown> | undefined),
       include_usage: true,
     };
   }
 
-  const backendUrl = `${model.backendUrl.replace(/\/$/, "")}/${
-    SUFFIX[requestType]
-  }`;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (model.backendApiKey) {
-    headers["Authorization"] = `Bearer ${model.backendApiKey}`;
+  const backends = orderBackendsForRequest(
+    model.id,
+    await getActiveBackends(model.id),
+    affinityKey(requestType, body),
+  );
+  if (backends.length === 0) {
+    return makeProxyError(
+      `Model '${modelAlias}' has no active backends`,
+      "server_error",
+      "backend_unavailable",
+      503,
+    );
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  try {
-    const backendResponse = await fetch(backendUrl, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(backendBody),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!backendResponse.ok) {
-      const backendErrorText = await backendResponse.text();
-      const normalizedError = normalizeBackendError(
-        backendErrorText,
-        backendResponse.status
-      );
-      if (normalizedError) {
-        return normalizedError;
-      }
-
-      return new Response(backendErrorText, {
-        status: backendResponse.status,
+  const outcome = await forwardWithFailover({
+    backends,
+    timeoutMs: timeout,
+    buildRequest: (backend) => ({
+      url: `${backend.backendUrl.replace(/\/$/, "")}/${SUFFIX[requestType]}`,
+      init: {
+        method: "POST",
         headers: {
-          "Content-Type":
-            backendResponse.headers.get("content-type") || "application/json",
+          "Content-Type": "application/json",
+          ...(backend.backendApiKey
+            ? { Authorization: `Bearer ${backend.backendApiKey}` }
+            : {}),
         },
-      });
+        body: JSON.stringify({
+          ...backendBodyBase,
+          model: backend.backendModel,
+        }),
+      },
+    }),
+  });
+
+  if (outcome.kind === "timeout") {
+    return makeProxyError(
+      "Request timed out",
+      "server_error",
+      "backend_timeout",
+      504,
+    );
+  }
+  if (outcome.kind === "network_error") {
+    return makeProxyError(
+      "Backend is unavailable",
+      "server_error",
+      "backend_unavailable",
+      502,
+    );
+  }
+  if (outcome.kind === "http_error") {
+    const normalizedError = normalizeBackendError(outcome.text, outcome.status);
+    if (normalizedError) {
+      return normalizedError;
+    }
+    return new Response(outcome.text, {
+      status: outcome.status,
+      headers: {
+        "Content-Type": outcome.contentType || "application/json",
+      },
+    });
+  }
+
+  const backendResponse = outcome.response;
+
+  if (isStream) {
+    // Stream response
+    if (!backendResponse.body) {
+      return makeProxyError(
+        "Backend returned empty response",
+        "server_error",
+        "backend_unavailable",
+        502,
+      );
     }
 
-    if (isStream) {
-      // Stream response
-      if (!backendResponse.body) {
-        return makeProxyError(
-          "Backend returned empty response",
-          "server_error",
-          "backend_unavailable",
-          502
-        );
-      }
+    let streamUsage = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+    };
 
-      let streamUsage = {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
-      };
-
-      const transformer = createStreamTransformer((usage) => {
-        streamUsage = usage;
-        const durationMs = Date.now() - startTime;
-        recordUsage({
-          userId: user.id,
-          modelId: model.id,
-          requestType,
-          ...usage,
-          isStream: true,
-          durationMs,
-          status: backendResponse.ok ? "success" : "error",
-          promptPreview,
-          clientIp,
-        });
-      });
-
-      const transformedStream = backendResponse.body.pipeThrough(transformer);
-
-      return new Response(transformedStream, {
-        status: backendResponse.status,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    } else {
-      // Non-streaming response
-      const responseText = await backendResponse.text();
+    const transformer = createStreamTransformer((usage) => {
+      streamUsage = usage;
       const durationMs = Date.now() - startTime;
-
-      let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-      try {
-        const json = JSON.parse(responseText);
-        if (json.usage) {
-          usage = {
-            promptTokens: json.usage.prompt_tokens || 0,
-            completionTokens: json.usage.completion_tokens || 0,
-            totalTokens: json.usage.total_tokens || 0,
-          };
-        }
-      } catch {
-        // Ignore parse errors
-      }
-
       recordUsage({
         userId: user.id,
         modelId: model.id,
         requestType,
         ...usage,
-        isStream: false,
+        isStream: true,
         durationMs,
         status: backendResponse.ok ? "success" : "error",
         promptPreview,
         clientIp,
       });
+    });
 
-      return new Response(responseText, {
-        status: backendResponse.status,
-        headers: {
-          "Content-Type":
-            backendResponse.headers.get("content-type") || "application/json",
-        },
-      });
+    const transformedStream = backendResponse.body.pipeThrough(transformer);
+
+    return new Response(transformedStream, {
+      status: backendResponse.status,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } else {
+    // Non-streaming response
+    const responseText = await backendResponse.text();
+    const durationMs = Date.now() - startTime;
+
+    let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    try {
+      const json = JSON.parse(responseText);
+      if (json.usage) {
+        usage = {
+          promptTokens: json.usage.prompt_tokens || 0,
+          completionTokens: json.usage.completion_tokens || 0,
+          totalTokens: json.usage.total_tokens || 0,
+        };
+      }
+    } catch {
+      // Ignore parse errors
     }
-  } catch (err: unknown) {
-    clearTimeout(timeoutId);
 
-    if (err instanceof Error && err.name === "AbortError") {
-      return makeProxyError(
-        "Request timed out",
-        "server_error",
-        "backend_timeout",
-        504
-      );
-    }
+    recordUsage({
+      userId: user.id,
+      modelId: model.id,
+      requestType,
+      ...usage,
+      isStream: false,
+      durationMs,
+      status: backendResponse.ok ? "success" : "error",
+      promptPreview,
+      clientIp,
+    });
 
-    console.error("[proxy] Backend error:", err);
-    return makeProxyError(
-      "Backend is unavailable",
-      "server_error",
-      "backend_unavailable",
-      502
-    );
+    return new Response(responseText, {
+      status: backendResponse.status,
+      headers: {
+        "Content-Type":
+          backendResponse.headers.get("content-type") || "application/json",
+      },
+    });
   }
 }

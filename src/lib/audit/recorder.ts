@@ -20,9 +20,20 @@ const REDACTED = "[REDACTED]";
 /** Noisy/bookkeeping keys excluded from diffs. */
 const IGNORE_KEYS = new Set(["createdat", "updatedat"]);
 
+/** Recurse into arrays and plain objects so secrets nested in payloads
+ *  (e.g. a model's backends[].backendApiKey) are redacted too. */
+function redactValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactValue);
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return redactSecrets(value as Record<string, unknown>);
+  }
+  return value;
+}
+
 /**
  * Return a copy with secret fields replaced by a placeholder and bookkeeping
- * fields dropped (shallow, one level). Used for one-sided create/delete payloads.
+ * fields dropped, recursing into nested arrays/objects. Used for one-sided
+ * create/delete payloads.
  */
 export function redactSecrets(
   obj: Record<string, unknown> | null | undefined
@@ -32,7 +43,7 @@ export function redactSecrets(
   for (const [key, value] of Object.entries(obj)) {
     const lower = key.toLowerCase();
     if (IGNORE_KEYS.has(lower)) continue;
-    out[key] = SECRET_KEYS.has(lower) ? REDACTED : value;
+    out[key] = SECRET_KEYS.has(lower) ? REDACTED : redactValue(value);
   }
   return out;
 }
@@ -69,8 +80,8 @@ export function diff(
     const a = after![key];
     if (Object.is(b, a) || JSON.stringify(b) === JSON.stringify(a)) continue;
     const isSecret = SECRET_KEYS.has(lower);
-    changedBefore[key] = isSecret ? REDACTED : b;
-    changedAfter[key] = isSecret ? REDACTED : a;
+    changedBefore[key] = isSecret ? REDACTED : redactValue(b);
+    changedAfter[key] = isSecret ? REDACTED : redactValue(a);
   }
   return { before: changedBefore, after: changedAfter };
 }

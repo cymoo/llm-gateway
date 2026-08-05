@@ -4,6 +4,7 @@ import { users, groups, models, userModels, groupModels } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
 import { getBackendContextWindows } from "@/lib/proxy/context-window";
+import { getActiveBackends } from "@/lib/proxy/backends";
 
 async function authenticate(req: NextRequest) {
   const authHeader = req.headers.get("authorization");
@@ -89,13 +90,23 @@ export async function GET(
     );
   }
 
-  // Best-effort context window from the backend's /models (cached); omitted
-  // when the backend is unreachable or advertises no window.
-  const windows = await getBackendContextWindows(
-    model.backendUrl,
-    model.backendApiKey
+  // Best-effort context window from each active backend's /models (cached);
+  // with several backends the safe served window is the minimum advertised.
+  // Omitted when no backend is reachable or advertises a window.
+  const backends = await getActiveBackends(model.id);
+  let maxModelLen: number | undefined;
+  await Promise.all(
+    backends.map(async (backend) => {
+      const windows = await getBackendContextWindows(
+        backend.backendUrl,
+        backend.backendApiKey
+      );
+      const len = windows.get(backend.backendModel);
+      if (len !== undefined && (maxModelLen === undefined || len < maxModelLen)) {
+        maxModelLen = len;
+      }
+    })
   );
-  const maxModelLen = windows.get(model.backendModel);
 
   return Response.json({
     id: model.alias,

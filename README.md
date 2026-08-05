@@ -10,6 +10,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 ## Features
 
 - Unified OpenAI-compatible proxy endpoints — `chat.completions`, `completions`, `embeddings`, and `rerank`
+- Multiple upstream backends per model with cache-affinity load balancing and automatic failover
 - Public self-registration (`/register`) with admin approval workflow
 - User and model access management
 - Quota and rate limiting per user/model
@@ -67,6 +68,9 @@ JWT_SECRET=replace-with-a-long-random-secret
 # Optional proxy timeout (ms)
 PROXY_TIMEOUT_NON_STREAM=300000
 PROXY_TIMEOUT_STREAM=600000
+
+# Optional cap on the conversation-head hash used for backend cache-affinity routing
+AFFINITY_PREFIX_LENGTH=16384
 ```
 
 ### 3) Initialize database

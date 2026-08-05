@@ -23,11 +23,17 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/lib/i18n";
 
+interface ModelBackend {
+  id: string;
+  backendUrl: string;
+  backendModel: string;
+  isActive: boolean | null;
+}
+
 interface Model {
   id: string;
   alias: string;
-  backendUrl: string;
-  backendModel: string;
+  backends: ModelBackend[];
   type?: string;
   remark?: string | null;
   isActive: boolean;
@@ -82,10 +88,29 @@ export default function ModelsPage() {
     try {
       const res = await fetch(`/api/admin/models/${id}/test`, { method: "POST" });
       const data = await res.json();
-      if (data.status === "ok") {
-        toast({ title: t("models.connected", { ms: data.latency_ms }) });
+      const results: Array<{
+        backendUrl: string;
+        status: string;
+        latency_ms?: number;
+        message?: string;
+      }> = data.results ?? [];
+      const okCount = results.filter((r) => r.status === "ok").length;
+      if (results.length > 0 && okCount === results.length) {
+        const maxLatency = Math.max(...results.map((r) => r.latency_ms ?? 0));
+        toast({ title: t("models.connected", { ms: maxLatency }) });
       } else {
-        toast({ title: t("models.connectionFailed"), description: data.message, variant: "destructive" });
+        const failures = results
+          .filter((r) => r.status !== "ok")
+          .map((r) => `${r.backendUrl}: ${r.message ?? "error"}`)
+          .join("; ");
+        toast({
+          title: t("models.backendsOk", {
+            ok: okCount,
+            total: results.length,
+          }),
+          description: failures || data.error,
+          variant: "destructive",
+        });
       }
     } finally {
       setTestingId(null);
@@ -193,10 +218,21 @@ export default function ModelsPage() {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-[hsl(var(--muted-foreground))] max-w-xs truncate">
-                    {model.backendUrl}
+                  <TableCell className="text-sm text-[hsl(var(--muted-foreground))] max-w-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">
+                        {model.backends[0]?.backendUrl ?? "—"}
+                      </span>
+                      {model.backends.length > 1 && (
+                        <Badge variant="outline" className="text-xs font-normal shrink-0">
+                          +{model.backends.length - 1}
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell className="text-sm">{model.backendModel}</TableCell>
+                  <TableCell className="text-sm">
+                    {model.backends[0]?.backendModel ?? "—"}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={model.isActive ? "default" : "secondary"}>
                       {model.isActive ? t("common.active") : t("common.inactive")}

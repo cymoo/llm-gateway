@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-08-05
+
+### Added: Multi-Backend Load Balancing
+
+- **One model alias → many upstream backends** — a model is now a public alias plus a list of backends (`model_backends` table), so the same model deployed on several vLLM servers no longer needs `-1`/`-2` alias suffixes. Existing models are migrated automatically (each becomes a single-backend model); previously suffixed aliases can be merged by adding their backends to one model in the admin console and deleting the rest. Quotas, authorizations, and usage statistics stay keyed on the model and aggregate across its backends unchanged.
+- **Cache-affinity routing with failover** — chat/completions requests are routed by hashing the conversation's stable head (system prompt + first user message) with rendezvous (HRW) hashing, so every turn of a conversation lands on the same backend and hits vLLM's prefix cache; different conversations spread evenly. Embeddings/rerank requests round-robin. When a backend is unreachable or returns 5xx/429, the request automatically fails over to the next backend (streamed requests included, up until streaming has started); non-429 4xx responses return immediately. A model with no active backends returns `503 backend_unavailable`. The Anthropic-compatible endpoint uses the same routing. The affinity hash-length guard is tunable via `AFFINITY_PREFIX_LENGTH` (default 16384).
+- **Admin multi-backend management** — the model form manages a list of backends (URL / served model name / API key / active toggle, per backend), the model list shows a backend count summary, and the **Test** button now probes every backend of a model (or a single one via `{ backendId }`), returning per-backend results. The admin API accepts a nested `backends` array on create/update while still accepting the legacy flat `backendUrl`/`backendModel`/`backendApiKey` fields as a single-backend shorthand. Audit-log redaction now recurses into nested payloads so per-backend API keys stay redacted.
+- **Context window across backends** — `GET /api/v1/models` (and the single-model variant) now reports `max_model_len` as the minimum advertised window across a model's active backends, the safe value whichever backend serves the request.
 
 ### Added: Rerank Models
 

@@ -1,7 +1,14 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { users, groups, models, userModels, groupModels } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  users,
+  groups,
+  models,
+  modelBackends,
+  userModels,
+  groupModels,
+} from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import { makeProxyError } from "@/lib/proxy/errors";
 import { getBackendContextWindows } from "@/lib/proxy/context-window";
 
@@ -64,15 +71,38 @@ export async function GET(req: NextRequest) {
   }
   const authorizedModels = Array.from(modelMap.values());
 
-  // Probe each distinct backend's /models once (cached) to discover context
-  // windows, then attach them by backend model id. Best-effort: a model whose
-  // backend is unreachable or advertises no window simply omits the field.
+  // Fetch each model's active backends, then probe each distinct backend's
+  // /models once (cached) to discover context windows. With several backends
+  // per model, the safe served window is the minimum of what they advertise.
+  // Best-effort: backends that are unreachable or advertise no window are
+  // ignored; a model with no advertised window omits the field.
+  const backendRows =
+    authorizedModels.length > 0
+      ? await db
+          .select()
+          .from(modelBackends)
+          .where(
+            and(
+              inArray(
+                modelBackends.modelId,
+                authorizedModels.map((m) => m.id)
+              ),
+              eq(modelBackends.isActive, true)
+            )
+          )
+      : [];
+
+  const backendsByModel = new Map<string, typeof backendRows>();
   const backendKeys = new Map<string, string | null>();
-  for (const model of authorizedModels) {
-    if (model.backendUrl && !backendKeys.has(model.backendUrl)) {
-      backendKeys.set(model.backendUrl, model.backendApiKey ?? null);
+  for (const backend of backendRows) {
+    const list = backendsByModel.get(backend.modelId);
+    if (list) list.push(backend);
+    else backendsByModel.set(backend.modelId, [backend]);
+    if (!backendKeys.has(backend.backendUrl)) {
+      backendKeys.set(backend.backendUrl, backend.backendApiKey ?? null);
     }
   }
+
   const windowMaps = new Map<string, Map<string, number>>();
   await Promise.all(
     Array.from(backendKeys, async ([url, key]) => {
@@ -81,9 +111,15 @@ export async function GET(req: NextRequest) {
   );
 
   const data = authorizedModels.map((model) => {
-    const maxModelLen = windowMaps
-      .get(model.backendUrl)
-      ?.get(model.backendModel);
+    let maxModelLen: number | undefined;
+    for (const backend of backendsByModel.get(model.id) ?? []) {
+      const len = windowMaps
+        .get(backend.backendUrl)
+        ?.get(backend.backendModel);
+      if (len !== undefined && (maxModelLen === undefined || len < maxModelLen)) {
+        maxModelLen = len;
+      }
+    }
     return {
       id: model.alias,
       object: "model",
