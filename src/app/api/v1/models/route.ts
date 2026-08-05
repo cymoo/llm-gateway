@@ -92,30 +92,36 @@ export async function GET(req: NextRequest) {
           )
       : [];
 
+  // Probes are deduped by (URL, API key) — matching the context-window cache
+  // key — so backends sharing a URL but not credentials probe independently.
+  const probeKey = (b: { backendUrl: string; backendApiKey: string | null }) =>
+    `${b.backendUrl} ${b.backendApiKey ?? ""}`;
+
   const backendsByModel = new Map<string, typeof backendRows>();
-  const backendKeys = new Map<string, string | null>();
+  const probes = new Map<string, { url: string; apiKey: string | null }>();
   for (const backend of backendRows) {
     const list = backendsByModel.get(backend.modelId);
     if (list) list.push(backend);
     else backendsByModel.set(backend.modelId, [backend]);
-    if (!backendKeys.has(backend.backendUrl)) {
-      backendKeys.set(backend.backendUrl, backend.backendApiKey ?? null);
+    if (!probes.has(probeKey(backend))) {
+      probes.set(probeKey(backend), {
+        url: backend.backendUrl,
+        apiKey: backend.backendApiKey ?? null,
+      });
     }
   }
 
   const windowMaps = new Map<string, Map<string, number>>();
   await Promise.all(
-    Array.from(backendKeys, async ([url, key]) => {
-      windowMaps.set(url, await getBackendContextWindows(url, key));
+    Array.from(probes, async ([key, { url, apiKey }]) => {
+      windowMaps.set(key, await getBackendContextWindows(url, apiKey));
     })
   );
 
   const data = authorizedModels.map((model) => {
     let maxModelLen: number | undefined;
     for (const backend of backendsByModel.get(model.id) ?? []) {
-      const len = windowMaps
-        .get(backend.backendUrl)
-        ?.get(backend.backendModel);
+      const len = windowMaps.get(probeKey(backend))?.get(backend.backendModel);
       if (len !== undefined && (maxModelLen === undefined || len < maxModelLen)) {
         maxModelLen = len;
       }

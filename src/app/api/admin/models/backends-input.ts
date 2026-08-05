@@ -35,6 +35,9 @@ export function parseBackendsArray(
     ) {
       return { error: "Each backend requires a backendModel (1-200 chars)" };
     }
+    if (e.isActive !== undefined && typeof e.isActive !== "boolean") {
+      return { error: "Backend isActive must be a boolean" };
+    }
     backends.push({
       id: typeof e.id === "string" ? e.id : undefined,
       backendUrl: e.backendUrl,
@@ -43,7 +46,7 @@ export function parseBackendsArray(
         typeof e.backendApiKey === "string" && e.backendApiKey !== ""
           ? e.backendApiKey
           : null,
-      isActive: e.isActive === undefined ? true : e.isActive === true,
+      isActive: e.isActive ?? true,
     });
   }
   return { backends };

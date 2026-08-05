@@ -6,10 +6,15 @@ import type { RequestType } from "./handler";
 // Cap on the serialized conversation head used as the cache-affinity key —
 // purely a hashing-cost guard against pathological payloads. Must stay long
 // enough to reach past a shared system prompt into the first user message,
-// or every conversation hashes to the same backend.
-const AFFINITY_PREFIX_LENGTH = parseInt(
-  process.env.AFFINITY_PREFIX_LENGTH || "16384",
-);
+// or every conversation hashes to the same backend. A non-numeric or
+// non-positive override would truncate every key to "" (one hot backend),
+// so such values fall back to the default.
+const DEFAULT_AFFINITY_PREFIX_LENGTH = 16384;
+const parsedAffinityLength = parseInt(process.env.AFFINITY_PREFIX_LENGTH || "");
+const AFFINITY_PREFIX_LENGTH =
+  Number.isFinite(parsedAffinityLength) && parsedAffinityLength > 0
+    ? parsedAffinityLength
+    : DEFAULT_AFFINITY_PREFIX_LENGTH;
 
 export async function getActiveBackends(
   modelId: string,

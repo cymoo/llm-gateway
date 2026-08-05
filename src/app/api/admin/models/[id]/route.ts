@@ -132,6 +132,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
     ];
   }
 
+  // A submitted backend id must reference one of this model's rows; anything
+  // else is a client bug that would otherwise be masked as a fresh insert.
+  if (backendsInput !== null) {
+    const existingIds = new Set(beforeBackends.map((b) => b.id));
+    const unknown = backendsInput.find(
+      (b) => b.id !== undefined && !existingIds.has(b.id)
+    );
+    if (unknown) {
+      return Response.json(
+        { error: `Unknown backend id: ${unknown.id}` },
+        { status: 400 }
+      );
+    }
+  }
+
   try {
     const updated = await db.transaction(async (tx) => {
       const [model] =

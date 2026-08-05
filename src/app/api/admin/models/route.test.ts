@@ -8,7 +8,9 @@ const {
   mockTransaction,
 } = vi.hoisted(() => {
   const insertReturning = vi.fn();
-  const insertValues = vi.fn(() => ({ returning: insertReturning }));
+  const insertValues = vi.fn((..._args: unknown[]) => ({
+    returning: insertReturning,
+  }));
   const insert = vi.fn(() => ({ values: insertValues }));
   const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
     fn({ insert })
@@ -182,7 +184,7 @@ describe("POST /api/admin/models", () => {
     const res = await POST(req as never);
 
     expect(res.status).toBe(201);
-    const values = mockInsertValues.mock.calls[0][0];
+    const values = mockInsertValues.mock.calls[0][0] as { remark?: string };
     expect(values.remark).toBe("internal model");
   });
 });
