@@ -26,11 +26,13 @@ export default function ModelDetailPage() {
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [hasNoBackends, setHasNoBackends] = useState(false);
   const [testingBackendId, setTestingBackendId] = useState<string | null>(null);
 
   useEffect(() => {
     setFetchLoading(true);
     setLoadError("");
+    setHasNoBackends(false);
     fetch(`/api/admin/models/${modelId}`)
       .then(async (r) => {
         // Without this guard an error body (e.g. `{ error: "..." }` from a 404,
@@ -61,6 +63,12 @@ export default function ModelDetailPage() {
               })
             )
           : [];
+        // An existing model with no backend rows is not a normal state: it
+        // means the 0.4 upgrade created model_backends without copying the
+        // old single-backend columns into it. Editing still needs a row to
+        // type into, but say so rather than presenting a blank row that is
+        // indistinguishable from the backend details having been wiped.
+        setHasNoBackends(backends.length === 0);
         setInitialForm({
           alias: data.alias || "",
           type: data.type || "chat",
@@ -196,6 +204,11 @@ export default function ModelDetailPage() {
           <p className="text-[hsl(var(--muted-foreground))]">{initialForm.alias}</p>
         </div>
       </div>
+      {hasNoBackends && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+          {t("models.noBackendsWarning")}
+        </div>
+      )}
       <ModelFormComponent
         initialForm={initialForm}
         onSubmit={handleSubmit}

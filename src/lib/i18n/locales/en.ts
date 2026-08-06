@@ -273,6 +273,8 @@ const en = {
     createdSuccess: "Model created successfully",
     editModel: "Edit Model",
     loadFailed: "Failed to load this model",
+    noBackendsWarning:
+      "This model has no backends configured. If it worked before upgrading to 0.4, its backend was not carried over — check that the database migrations were applied (npm run migrate). The empty backend below is a blank form, not the stored configuration; filling it in and saving will restore the model.",
     users: "Users",
     remark: "Remark",
   },

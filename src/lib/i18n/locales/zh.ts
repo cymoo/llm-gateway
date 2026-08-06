@@ -265,6 +265,8 @@ const zh: Translations = {
     createdSuccess: "模型创建成功",
     editModel: "编辑模型",
     loadFailed: "加载该模型失败",
+    noBackendsWarning:
+      "该模型没有配置任何后端。如果它在升级到 0.4 之前可以正常使用，说明原有后端未被迁移过来——请确认数据库迁移已执行（npm run migrate）。下方的空白后端是新建表单，并非已保存的配置；填写并保存即可恢复该模型。",
     users: "用户",
     remark: "备注",
   },
