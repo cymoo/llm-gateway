@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-08-06
+
+### 🐛 Bug Fixes
+
+- **A model with no backends no longer looks like a model whose backend details were wiped** — when a model has no rows in `model_backends`, the edit page silently substitutes one blank backend, which renders as a populated-looking "Backend 1" card with empty URL, model name and API key. After upgrading from 0.3 that is exactly what a model looks like when the upgrade created `model_backends` without copying the old single-backend columns into it (for example when the table was created by a schema sync rather than by `npm run migrate`, which is what carries the data across). The blank row is still offered so the model can be repaired in place, but the page now states that the model has no backends configured, that the row below is an empty form rather than stored configuration, and that pending migrations are the likely cause.
+
 ## [0.4.2] - 2026-08-06
 
 ### 🐛 Bug Fixes
