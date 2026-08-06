@@ -1,0 +1,12 @@
+-- Drop the NOT NULL on users.group_id.
+--
+-- 0001_add_groups.sql appended `SET NOT NULL` by hand after the generated
+-- section, so drizzle never recorded it: every snapshot since has declared the
+-- column nullable and no corrective ALTER was ever generated. Meanwhile the
+-- application treats a missing group as valid throughout — the proxy falls back
+-- to per-user quotas (`!group || group.isDefault`), the admin PUT handler has an
+-- explicit `groupId === null` branch, and the users list renders "—".
+--
+-- Aligning the database with the declared schema, rather than the reverse, keeps
+-- that behaviour reachable instead of failing with an opaque 23502.
+ALTER TABLE "users" ALTER COLUMN "group_id" DROP NOT NULL;

@@ -442,7 +442,7 @@ function createAnthropicStreamTransformer(
   onComplete: (usage: StreamUsage) => void,
 ): TransformStream<Uint8Array, Uint8Array> {
   let buffer = "";
-  let lastUsage: StreamUsage = {
+  const lastUsage: StreamUsage = {
     promptTokens: 0,
     completionTokens: 0,
     totalTokens: 0,

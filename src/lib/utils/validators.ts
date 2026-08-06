@@ -1,4 +1,8 @@
-export const MODEL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9._/-]*[a-z0-9])?$/;
+// `/` and `-` are escaped so `.source` stays valid when reused as an HTML
+// `pattern` attribute: browsers compile that attribute with the RegExp `v`
+// flag, which rejects both characters unescaped inside a character class.
+// An invalid `pattern` is silently ignored per spec, disabling validation.
+export const MODEL_ALIAS_PATTERN = /^[a-z0-9]([a-z0-9._\/\-]*[a-z0-9])?$/;
 export const ADMIN_PASSWORD_PATTERN = /^[\x21-\x7e]+$/;
 
 export function validateModelAlias(alias: string): boolean {

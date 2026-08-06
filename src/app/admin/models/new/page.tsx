@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/lib/i18n";
+import { MODEL_ALIAS_PATTERN } from "@/lib/utils/validators";
 
 export interface BackendForm {
   id?: string;
@@ -141,7 +142,7 @@ export function ModelFormComponent({
               value={form.alias}
               onChange={(e) => set("alias", e.target.value)}
               placeholder="my-qwen3"
-              pattern="^[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+              pattern={MODEL_ALIAS_PATTERN.source}
               required
             />
             <p className="text-xs text-[hsl(var(--muted-foreground))]">

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-06
+
+### 🐛 Bug Fixes
+
+- **Deleting a user no longer fails** — `usage_logs.user_id` and `daily_usage.user_id` referenced `users(id)` with `ON DELETE NO ACTION`, so deleting any user who had ever made a request raised a foreign-key violation. Because the handler did not catch it, the failure surfaced as a bare 500 with no error body and the admin console showed an empty error toast — deletion appeared to do nothing at all. Users with no usage history deleted fine, which made the failure look intermittent. Both constraints are now `ON DELETE SET NULL`: the account is removed while its usage rows survive anonymised, so historical totals on the dashboard stay accurate. The endpoint also translates any remaining foreign-key violation into a readable `409` instead of a 500, and the console falls back to a generic message when an error response is not JSON.
+- **`users.group_id` schema drift** — the initial groups migration appended `SET NOT NULL` by hand after its generated section, so Drizzle never recorded it: every snapshot since declared the column nullable and no corrective migration was ever generated. Meanwhile the application treats a missing group as valid throughout — the proxy falls back to per-user quotas, the admin update endpoint has an explicit `groupId: null` branch, and the user list renders `—`. Sending `groupId: null` to the update endpoint, or creating a user while no default group exists, therefore failed with an opaque 500. The database is now aligned with the declared schema, making those paths reachable as intended.
+- **Model alias validation was silently disabled** — the alias field's HTML `pattern` attribute used an unescaped `-` and `/` inside a character class. Browsers compile that attribute with the RegExp `v` flag, which rejects both, and per the HTML specification a pattern that fails to compile is ignored entirely — so the field accepted any input client-side and logged a `SyntaxError` to the console on every render of the model form. The pattern was also stricter than the server's, rejecting valid aliases such as `openai/gpt-4o`. The form now derives its pattern from the shared `MODEL_ALIAS_PATTERN`, so client and server validation can no longer drift, and the alias hint text now lists the separators that are actually accepted.
+
 ## [0.4.0] - 2026-08-05
 
 ### Added: Multi-Backend Load Balancing

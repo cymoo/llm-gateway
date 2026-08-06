@@ -196,7 +196,8 @@ CREATE TABLE user_model_quotas (
 -- ============================================
 CREATE TABLE usage_logs (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id             UUID REFERENCES users(id),
+    -- SET NULL：删除用户后用量记录以匿名形式保留，历史统计保持准确
+    user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
     model_id            UUID REFERENCES models(id),
     request_type        VARCHAR(50) NOT NULL,     -- "chat.completions" | "completions" | "embeddings"
     prompt_tokens       INT DEFAULT 0,
@@ -213,7 +214,7 @@ CREATE TABLE usage_logs (
 -- ============================================
 CREATE TABLE daily_usage (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id),
+    user_id         UUID REFERENCES users(id) ON DELETE SET NULL,  -- 同 usage_logs
     model_id        UUID REFERENCES models(id),
     date            DATE NOT NULL,
     total_tokens    BIGINT DEFAULT 0,

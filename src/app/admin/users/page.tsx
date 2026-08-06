@@ -124,8 +124,14 @@ function UsersContent() {
       toast({ title: t("users.userDeleted") });
       fetchUsers();
     } else {
-      const d = await res.json();
-      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
+      // Error responses are not guaranteed to be JSON (e.g. a proxy 502), so
+      // fall back to a generic message rather than throwing past the toast.
+      const d = await res.json().catch(() => null);
+      toast({
+        title: t("common.error"),
+        description: d?.error || t("users.failedDelete"),
+        variant: "destructive",
+      });
     }
   };
 
