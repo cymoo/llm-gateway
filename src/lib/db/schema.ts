@@ -136,7 +136,9 @@ export const usageLogs = pgTable(
   "usage_logs",
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    userId: uuid("user_id").references(() => users.id),
+    // Usage history outlives the user: deleting a user anonymises their rows
+    // instead of blocking the delete, so aggregate stats stay accurate.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     modelId: uuid("model_id").references(() => models.id),
     requestType: varchar("request_type", { length: 50 }).notNull(),
     promptTokens: integer("prompt_tokens").default(0),
@@ -162,7 +164,8 @@ export const dailyUsage = pgTable(
   "daily_usage",
   {
     id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-    userId: uuid("user_id").references(() => users.id),
+    // See usageLogs.userId: anonymised rather than removed on user deletion.
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     modelId: uuid("model_id").references(() => models.id),
     date: date("date").notNull(),
     totalTokens: bigint("total_tokens", { mode: "number" }).default(0),

@@ -166,6 +166,7 @@ const en = {
     revokeModelConfirm: 'Revoke access to model "{alias}"?',
     saving: "Saving…",
     failedFetch: "Failed to fetch users",
+    failedDelete: "Failed to delete user",
   },
   groups: {
     title: "Groups",
@@ -239,7 +240,7 @@ const en = {
     modelAlias: "Model Alias",
     aliasVisible: "(user-visible name)",
     aliasHint:
-      "Only lowercase letters, digits, hyphens. Cannot start/end with hyphen.",
+      "Only lowercase letters, digits and . _ / - characters. Must start and end with a letter or digit.",
     backendUrlLabel: "Backend URL",
     backendModelName: "Backend Model Name",
     backends: "Backends",

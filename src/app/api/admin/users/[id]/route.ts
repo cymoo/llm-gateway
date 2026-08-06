@@ -14,6 +14,16 @@ import { recordAudit, diff } from "@/lib/audit/recorder";
 
 type Params = { params: Promise<{ id: string }> };
 
+/** Postgres foreign_key_violation. pg surfaces it as `code` on the error. */
+function isForeignKeyViolation(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "23503"
+  );
+}
+
 export async function GET(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);
   if (!admin) return unauthorizedResponse();
@@ -116,10 +126,23 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return Response.json({ error: "Cannot delete your own account" }, { status: 400 });
   }
 
-  const [deleted] = await db
-    .delete(users)
-    .where(eq(users.id, id))
-    .returning();
+  let deleted: typeof users.$inferSelect | undefined;
+  try {
+    [deleted] = await db.delete(users).where(eq(users.id, id)).returning();
+  } catch (err: unknown) {
+    // 23503: a table still referencing this user blocks the delete. Surface a
+    // readable message instead of an opaque 500.
+    if (isForeignKeyViolation(err)) {
+      return Response.json(
+        {
+          error:
+            "User still has linked records and cannot be deleted. Deactivate the account instead.",
+        },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 
   if (!deleted) return notFoundResponse("User not found");
 

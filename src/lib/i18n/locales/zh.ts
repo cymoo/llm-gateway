@@ -163,6 +163,7 @@ const zh: Translations = {
     revokeModelConfirm: '确定撤销模型 "{alias}" 的访问权限？',
     saving: "保存中…",
     failedFetch: "获取用户列表失败",
+    failedDelete: "删除用户失败",
   },
   groups: {
     title: "分组管理",
@@ -233,7 +234,7 @@ const zh: Translations = {
     basicConfig: "基础配置",
     modelAlias: "模型别名",
     aliasVisible: "（用户可见名称）",
-    aliasHint: "仅允许小写字母、数字和连字符，不能以连字符开头或结尾。",
+    aliasHint: "仅允许小写字母、数字及 . _ / - 字符，必须以字母或数字开头和结尾。",
     backendUrlLabel: "后端 URL",
     backendModelName: "后端模型名称",
     backends: "后端列表",
