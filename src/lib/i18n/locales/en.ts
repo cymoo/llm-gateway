@@ -272,6 +272,7 @@ const en = {
     testBtn: "Test Connection",
     createdSuccess: "Model created successfully",
     editModel: "Edit Model",
+    loadFailed: "Failed to load this model",
     users: "Users",
     remark: "Remark",
   },

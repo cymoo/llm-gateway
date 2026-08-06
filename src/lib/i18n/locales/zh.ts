@@ -264,6 +264,7 @@ const zh: Translations = {
     testBtn: "测试连接",
     createdSuccess: "模型创建成功",
     editModel: "编辑模型",
+    loadFailed: "加载该模型失败",
     users: "用户",
     remark: "备注",
   },

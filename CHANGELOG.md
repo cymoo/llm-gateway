@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2026-08-06
+
+### 🐛 Bug Fixes
+
+- **Model edit page rendered a blank form instead of an error** — the loader on `/admin/models/<id>` never checked `res.ok`, so an error response was parsed as if it were a model. Every field then read as `undefined`, and the backend list fell through to its "no backends yet" fallback, producing an empty backend row. The page therefore looked like a model whose backend URL, served model name and API key had all been lost, when in fact the request had failed — most visibly after upgrading to 0.4.x with the code deployed before `npm run migrate` had been run, since the missing `model_backends` table makes the endpoint return 500. The loader now rejects non-OK responses and the page reports the failure (including the server's message) instead of showing an editable blank form. The sibling user and group detail pages already guarded this and are unchanged.
+
 ## [0.4.1] - 2026-08-06
 
 ### 🐛 Bug Fixes

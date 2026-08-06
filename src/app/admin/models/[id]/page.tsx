@@ -25,11 +25,24 @@ export default function ModelDetailPage() {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
   const [testingBackendId, setTestingBackendId] = useState<string | null>(null);
 
   useEffect(() => {
+    setFetchLoading(true);
+    setLoadError("");
     fetch(`/api/admin/models/${modelId}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        // Without this guard an error body (e.g. `{ error: "..." }` from a 404,
+        // a 401, or a 500 when a migration has not been applied) parses fine,
+        // leaving every field undefined — the form would then render blank and
+        // look like the model simply had no backends configured.
+        if (!r.ok) {
+          const body = await r.json().catch(() => null);
+          throw new Error(body?.error || `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
       .then((data) => {
         const backends: BackendForm[] = Array.isArray(data.backends)
           ? data.backends.map(
@@ -70,6 +83,10 @@ export default function ModelDetailPage() {
           defaultAllowedTimeStart: data.defaultAllowedTimeStart || "",
           defaultAllowedTimeEnd: data.defaultAllowedTimeEnd || "",
         });
+      })
+      .catch((err: unknown) => {
+        setInitialForm(null);
+        setLoadError(err instanceof Error ? err.message : String(err));
       })
       .finally(() => setFetchLoading(false));
   }, [modelId]);
@@ -147,7 +164,24 @@ export default function ModelDetailPage() {
     );
   }
 
-  if (!initialForm) return <div>Model not found</div>;
+  if (!initialForm) {
+    return (
+      <div className="space-y-4 max-w-2xl">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/models">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-2xl font-bold">{t("models.editModel")}</h1>
+        </div>
+        <p className="text-sm text-[hsl(var(--destructive))]">
+          {t("models.loadFailed")}
+          {loadError ? `: ${loadError}` : ""}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-2xl">
