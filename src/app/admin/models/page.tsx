@@ -53,6 +53,7 @@ export default function ModelsPage() {
   const [models, setModels] = useState<Model[]>([]);
   const [loading, setLoading] = useState(true);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<{ id: string; alias: string } | null>(null);
   const [modelUsers, setModelUsers] = useState<ModelUser[]>([]);
   const [loadingModelUsers, setLoadingModelUsers] = useState(false);
@@ -72,14 +73,37 @@ export default function ModelsPage() {
   }, [fetchModels]);
 
   const handleDelete = async (id: string, alias: string) => {
+    if (deletingId) return;
     if (!confirm(t("models.deleteConfirm", { alias }))) return;
-    const res = await fetch(`/api/admin/models/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast({ title: t("models.modelDeleted") });
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/models/${id}`, { method: "DELETE" });
+      // 404 means the model is already gone (e.g. a duplicated request) — the
+      // admin's intent is satisfied, so don't report it as a failure.
+      if (res.ok || res.status === 404) {
+        toast({ title: t("models.modelDeleted") });
+      } else {
+        // Error responses are not guaranteed to be JSON (e.g. a proxy 502), so
+        // fall back to a generic message rather than throwing past the toast.
+        const d = await res.json().catch(() => null);
+        toast({
+          title: t("common.error"),
+          description: d?.error || t("models.failedDelete"),
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: t("common.error"),
+        description: t("models.failedDelete"),
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingId(null);
+      // Always re-sync: on failure the row may still be gone server-side, and
+      // a stale row that only disappears on the next page load looks like the
+      // delete silently happened later.
       fetchModels();
-    } else {
-      const d = await res.json();
-      toast({ title: t("common.error"), description: d.error, variant: "destructive" });
     }
   };
 
@@ -275,6 +299,7 @@ export default function ModelsPage() {
                         size="icon"
                         title={t("common.delete")}
                         onClick={() => handleDelete(model.id, model.alias)}
+                        disabled={deletingId !== null}
                       >
                         <Trash2 className="h-4 w-4 text-[hsl(var(--destructive))]" />
                       </Button>

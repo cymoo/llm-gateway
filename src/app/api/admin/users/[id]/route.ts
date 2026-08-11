@@ -11,18 +11,9 @@ import {
 } from "@/app/api/admin/middleware";
 import { validateAdminPassword } from "@/lib/utils/validators";
 import { recordAudit, diff } from "@/lib/audit/recorder";
+import { isForeignKeyViolation } from "@/lib/db/errors";
 
 type Params = { params: Promise<{ id: string }> };
-
-/** Postgres foreign_key_violation. pg surfaces it as `code` on the error. */
-function isForeignKeyViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: unknown }).code === "23503"
-  );
-}
 
 export async function GET(req: NextRequest, { params }: Params) {
   const admin = await getAdminUser(req);

@@ -219,6 +219,7 @@ const zh: Translations = {
     testConnection: "测试连接",
     testing: "测试中...",
     modelDeleted: "模型已删除",
+    failedDelete: "删除模型失败",
     deleteConfirm: '删除模型 "{alias}"？所有用户授权将被移除。',
     connected: "已连接（{ms}ms）",
     connectionFailed: "连接失败",
