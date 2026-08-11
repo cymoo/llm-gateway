@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-08-11
+
+### 🐛 Bug Fixes
+
+- **Deleting a model appeared to fail, then the model was gone later** — `usage_logs.model_id` and `daily_usage.model_id` reference `models(id)` with `ON DELETE NO ACTION`, so the delete endpoint cleared those rows by hand before removing the model. The cleanup and the delete were separate, uncommitted-in-isolation statements, and usage is written *after* the proxy response has been sent, so a request still in flight could insert a usage row for the model in the gap between them. The delete then hit a foreign-key violation, which the handler did not catch: it surfaced as a bare 500 with no body, and since the console called `res.json()` on it unconditionally, not even an error toast appeared — the click did nothing at all. The cleanup, meanwhile, was already committed, so that model's `daily_usage` rows were destroyed and its `usage_logs` detached even though it still existed; a later retry then succeeded, which is why the model turned out to be gone the next time the page was opened. The whole delete now runs in one transaction that takes a `FOR UPDATE` lock on the model row before touching anything else. That lock conflicts with the `FOR KEY SHARE` lock a usage insert takes on the referenced row, so a concurrent usage write waits for the delete to commit and then fails harmlessly against a model that no longer exists (the usage recorder already logs and swallows this). A failed delete now rolls back instead of destroying usage history, and any remaining foreign-key violation is translated into a readable `409` rather than a 500.
+- **A failed delete left the deleted model on screen** — the model list was only refetched when the request succeeded, so whenever a delete reported failure while the row was in fact already gone server-side, the console kept showing it until the next full page load. The list is now re-synced after every delete attempt, a `404` is treated as "already deleted" rather than an error, error bodies that are not JSON fall back to a generic message, and the delete buttons are disabled while a delete is in flight.
+
 ## [0.4.3] - 2026-08-06
 
 ### 🐛 Bug Fixes

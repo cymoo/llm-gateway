@@ -223,6 +223,7 @@ const en = {
     testConnection: "Test connection",
     testing: "Testing...",
     modelDeleted: "Model deleted",
+    failedDelete: "Failed to delete model",
     deleteConfirm:
       'Delete model "{alias}"? All user authorizations will be removed.',
     connected: "Connected ({ms}ms)",

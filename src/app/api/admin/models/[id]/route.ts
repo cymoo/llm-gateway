@@ -14,6 +14,7 @@ import {
   validateUrl,
 } from "@/lib/utils/validators";
 import { recordAudit, diff } from "@/lib/audit/recorder";
+import { isForeignKeyViolation } from "@/lib/db/errors";
 import { parseBackendsArray, BackendInput } from "../backends-input";
 
 type Params = { params: Promise<{ id: string }> };
@@ -239,17 +240,49 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  // Nullify model references in usage logs and remove daily usage records
-  // to avoid FK constraint violations (these tables don't cascade on delete)
-  await Promise.all([
-    db.update(usageLogs).set({ modelId: null }).where(eq(usageLogs.modelId, id)),
-    db.delete(dailyUsage).where(eq(dailyUsage.modelId, id)),
-  ]);
+  let deleted: typeof models.$inferSelect | undefined;
+  try {
+    deleted = await db.transaction(async (tx) => {
+      // Lock the model row before touching anything else. Usage is written
+      // after the proxy response (see recordUsage), so a request still in
+      // flight can insert a usage_logs/daily_usage row for this model at any
+      // moment; landing between the cleanup below and the delete, it would
+      // fail the delete on a FK violation. FOR UPDATE conflicts with the FOR
+      // KEY SHARE lock those inserts take on the referenced row, so they wait
+      // for this transaction and then fail harmlessly (and are logged) against
+      // the model that is by then gone.
+      const [locked] = await tx
+        .select({ id: models.id })
+        .from(models)
+        .where(eq(models.id, id))
+        .for("update")
+        .limit(1);
+      if (!locked) return undefined;
 
-  const [deleted] = await db
-    .delete(models)
-    .where(eq(models.id, id))
-    .returning();
+      // usage_logs and daily_usage don't cascade: detach the history so it
+      // survives the model, and drop the aggregates keyed on it. Both run in
+      // this transaction, so a failed delete rolls them back instead of
+      // destroying usage data for a model that is still there.
+      await tx
+        .update(usageLogs)
+        .set({ modelId: null })
+        .where(eq(usageLogs.modelId, id));
+      await tx.delete(dailyUsage).where(eq(dailyUsage.modelId, id));
+
+      const [row] = await tx.delete(models).where(eq(models.id, id)).returning();
+      return row;
+    });
+  } catch (err: unknown) {
+    // 23503: a table still referencing this model blocks the delete. Surface a
+    // readable message instead of an opaque 500 with an empty body.
+    if (isForeignKeyViolation(err)) {
+      return Response.json(
+        { error: "Model still has linked records and cannot be deleted" },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 
   if (!deleted) return notFoundResponse("Model not found");
 
