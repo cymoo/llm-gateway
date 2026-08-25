@@ -4,6 +4,9 @@ import { usageLogs, users, models } from "@/lib/db/schema";
 import { sql, eq, and, gte, lte, desc } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function escapeCsvValue(value: unknown): string {
   const text = value == null ? "" : String(value);
   const protectedText = /^[=+\-@]/.test(text) ? `'${text}` : text;
@@ -84,6 +87,10 @@ export async function GET(req: NextRequest) {
   const ip = searchParams.get("ip");
   const format = searchParams.get("format");
   const offset = (page - 1) * limit;
+
+  if (backendId && !UUID_PATTERN.test(backendId)) {
+    return Response.json({ error: "Invalid backendId" }, { status: 400 });
+  }
 
   const conditions = [];
   if (startDate)
