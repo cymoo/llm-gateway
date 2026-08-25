@@ -4,6 +4,9 @@ import { usageLogs, users, models } from "@/lib/db/schema";
 import { sql, eq, and, gte, lte, desc } from "drizzle-orm";
 import { getAdminUser, unauthorizedResponse } from "@/app/api/admin/middleware";
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function escapeCsvValue(value: unknown): string {
   const text = value == null ? "" : String(value);
   const protectedText = /^[=+\-@]/.test(text) ? `'${text}` : text;
@@ -21,6 +24,8 @@ function toCsv(logs: Array<{
   isStream: boolean | null;
   durationMs: number | null;
   status: string | null;
+  backendId: string | null;
+  backendUrl: string | null;
   promptPreview: string | null;
   clientIp: string | null;
   createdAt: Date | null;
@@ -37,6 +42,8 @@ function toCsv(logs: Array<{
     "stream",
     "duration_ms",
     "status",
+    "backend_id",
+    "backend_url",
     "prompt_preview",
     "client_ip",
   ];
@@ -53,6 +60,8 @@ function toCsv(logs: Array<{
       log.isStream ?? false,
       log.durationMs ?? "",
       log.status ?? "",
+      log.backendId ?? "",
+      log.backendUrl ?? "",
       log.promptPreview ?? "",
       log.clientIp ?? "",
     ]
@@ -74,9 +83,14 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get("endDate");
   const userId = searchParams.get("userId");
   const modelId = searchParams.get("modelId");
+  const backendId = searchParams.get("backendId");
   const ip = searchParams.get("ip");
   const format = searchParams.get("format");
   const offset = (page - 1) * limit;
+
+  if (backendId && !UUID_PATTERN.test(backendId)) {
+    return Response.json({ error: "Invalid backendId" }, { status: 400 });
+  }
 
   const conditions = [];
   if (startDate)
@@ -89,6 +103,7 @@ export async function GET(req: NextRequest) {
     );
   if (userId) conditions.push(eq(usageLogs.userId, userId));
   if (modelId) conditions.push(eq(usageLogs.modelId, modelId));
+  if (backendId) conditions.push(eq(usageLogs.backendId, backendId));
   if (ip) conditions.push(eq(usageLogs.clientIp, ip));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -106,6 +121,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        backendId: usageLogs.backendId,
+        backendUrl: usageLogs.backendUrl,
         promptPreview: usageLogs.promptPreview,
         clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,
@@ -148,6 +165,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        backendId: usageLogs.backendId,
+        backendUrl: usageLogs.backendUrl,
         promptPreview: usageLogs.promptPreview,
         clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,

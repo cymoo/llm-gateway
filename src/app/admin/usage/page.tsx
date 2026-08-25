@@ -63,6 +63,8 @@ interface Log {
   isStream: boolean;
   durationMs: number | null;
   status: string | null;
+  backendId: string | null;
+  backendUrl: string | null;
   promptPreview: string | null;
   clientIp: string | null;
   createdAt: string;
@@ -72,6 +74,14 @@ interface FilterOption {
   id: string;
   name?: string;
   alias?: string;
+}
+
+interface ModelFilterOption extends FilterOption {
+  backends?: Array<{
+    id: string;
+    backendUrl: string;
+    isActive: boolean | null;
+  }>;
 }
 
 const PROMPT_TRUNCATE_LENGTH = 50;
@@ -86,6 +96,17 @@ function formatTooltipNumber(value: unknown): string {
   const raw = Array.isArray(value) ? (value.length > 0 ? value[0] : null) : value;
   const num = typeof raw === "number" ? raw : Number(raw);
   return Number.isFinite(num) ? formatNum(num) : "N/A";
+}
+
+function formatBackendUrl(url: string | null): string {
+  if (!url) return "—";
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/$/, "");
+    return `${parsed.host}${path === "" ? "" : path}`;
+  } catch {
+    return url;
+  }
 }
 
 function getDefaultRange() {
@@ -120,8 +141,9 @@ function UsageContent() {
   const [userFilter, setUserFilter] = useState("");
   const [ipFilter, setIpFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
+  const [backendFilter, setBackendFilter] = useState("");
   const [userOptions, setUserOptions] = useState<FilterOption[]>([]);
-  const [modelOptions, setModelOptions] = useState<FilterOption[]>([]);
+  const [modelOptions, setModelOptions] = useState<ModelFilterOption[]>([]);
 
   const logsLimit = 50;
 
@@ -157,6 +179,7 @@ function UsageContent() {
     });
     if (userFilter) qs.set("userId", userFilter);
     if (modelFilter) qs.set("modelId", modelFilter);
+    if (backendFilter) qs.set("backendId", backendFilter);
     if (ipFilter.trim()) qs.set("ip", ipFilter.trim());
     const res = await fetch(`/api/admin/usage/logs?${qs}`);
     if (!res.ok) return;
@@ -192,6 +215,7 @@ function UsageContent() {
         });
         if (userFilter) logsQs.set("userId", userFilter);
         if (modelFilter) logsQs.set("modelId", modelFilter);
+        if (backendFilter) logsQs.set("backendId", backendFilter);
         if (ipFilter.trim()) logsQs.set("ip", ipFilter.trim());
         const res = await fetch(`/api/admin/usage/logs?${logsQs}`);
         if (res.ok) {
@@ -203,7 +227,7 @@ function UsageContent() {
     } finally {
       setLoading(false);
     }
-  }, [tab, dateRange, logsPage, userFilter, ipFilter, modelFilter]);
+  }, [tab, dateRange, logsPage, userFilter, ipFilter, modelFilter, backendFilter]);
 
   useEffect(() => {
     fetchData();
@@ -224,6 +248,14 @@ function UsageContent() {
   }, []);
 
   const totalPages = Math.ceil(logsTotal / logsLimit);
+  const backendOptions = modelOptions
+    .filter((model) => !modelFilter || model.id === modelFilter)
+    .flatMap((model) =>
+      (model.backends ?? []).map((backend) => ({
+        value: backend.id,
+        label: `${model.alias || model.id} · ${formatBackendUrl(backend.backendUrl)}`,
+      }))
+    );
 
   return (
     <div className="space-y-6">
@@ -444,7 +476,7 @@ function UsageContent() {
         <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label>{t("usage.user")}</Label>
                   <SearchableSelect
@@ -474,6 +506,7 @@ function UsageContent() {
                     onChange={(e) => {
                       setLogsPage(1);
                       setModelFilter(e.target.value);
+                      setBackendFilter("");
                     }}
                   >
                     <option value="">{t("usage.allModels")}</option>
@@ -483,6 +516,16 @@ function UsageContent() {
                       </option>
                     ))}
                   </select>
+                </div>
+                <div className="space-y-1">
+                  <Label>{t("usage.backend")}</Label>
+                  <SearchableSelect
+                    value={backendFilter}
+                    onChange={(v) => { setLogsPage(1); setBackendFilter(v); }}
+                    options={backendOptions}
+                    placeholder={t("usage.allBackends")}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </CardContent>
@@ -501,6 +544,7 @@ function UsageContent() {
                   <TableHead>{t("usage.user")}</TableHead>
                   <TableHead>{t("usage.ip")}</TableHead>
                   <TableHead>{t("usage.model")}</TableHead>
+                  <TableHead>{t("usage.backend")}</TableHead>
                   <TableHead>{t("usage.type")}</TableHead>
                   <TableHead>{t("usage.prompt")}</TableHead>
                   <TableHead className="text-right">{t("usage.tokens")}</TableHead>
@@ -511,13 +555,13 @@ function UsageContent() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                    <TableCell colSpan={10} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                       {t("common.loading")}
                     </TableCell>
                   </TableRow>
                 ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+                    <TableCell colSpan={10} className="text-center py-8 text-[hsl(var(--muted-foreground))]">
                       {t("usage.noLogs")}
                     </TableCell>
                   </TableRow>
@@ -532,6 +576,12 @@ function UsageContent() {
                         {log.clientIp || "—"}
                       </TableCell>
                       <TableCell className="text-sm font-mono">{log.modelAlias || "—"}</TableCell>
+                      <TableCell
+                        className="text-xs font-mono max-w-[220px] truncate"
+                        title={log.backendUrl || log.backendId || undefined}
+                      >
+                        {formatBackendUrl(log.backendUrl)}
+                      </TableCell>
                       <TableCell className="text-xs">
                         <div className="flex items-center gap-1">
                           {log.requestType.split(".")[1] || log.requestType}
@@ -622,6 +672,16 @@ function UsageContent() {
                 : t("usage.requestPromptContent")}
             </DialogDescription>
           </DialogHeader>
+          <div className="grid gap-2 rounded-md border p-3 text-sm sm:grid-cols-2">
+            <div>
+              <span className="text-[hsl(var(--muted-foreground))]">{t("usage.backend")}: </span>
+              <span className="font-mono break-all">{selectedLog?.backendUrl || "—"}</span>
+            </div>
+            <div>
+              <span className="text-[hsl(var(--muted-foreground))]">{t("usage.backendId")}: </span>
+              <span className="font-mono break-all">{selectedLog?.backendId || "—"}</span>
+            </div>
+          </div>
           <div className="max-h-[70vh] overflow-auto rounded-md border p-3">
             <pre className="whitespace-pre-wrap break-words text-sm">
               {selectedLog?.promptPreview || "—"}

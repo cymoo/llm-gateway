@@ -381,6 +381,8 @@ export async function handleProxy(
         isStream: true,
         durationMs,
         status: backendResponse.ok ? "success" : "error",
+        backendId: outcome.backend.id,
+        backendUrl: outcome.backend.backendUrl,
         promptPreview,
         clientIp,
       });
@@ -423,6 +425,8 @@ export async function handleProxy(
       isStream: false,
       durationMs,
       status: backendResponse.ok ? "success" : "error",
+      backendId: outcome.backend.id,
+      backendUrl: outcome.backend.backendUrl,
       promptPreview,
       clientIp,
     });

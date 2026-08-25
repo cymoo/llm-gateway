@@ -187,9 +187,18 @@ describe("handleProxy multi-backend", () => {
       JSON.parse(c[1].body as string)
     );
     expect(new Set(bodies.map((b) => b.model)).size).toBe(2);
+    const finalUrl = urls[1];
+    const finalBackend = finalUrl.startsWith(backend1.backendUrl)
+      ? backend1
+      : backend2;
     expect(mockRecordUsage).toHaveBeenCalledTimes(1);
     expect(mockRecordUsage).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: "model-1", totalTokens: 3 })
+      expect.objectContaining({
+        modelId: "model-1",
+        totalTokens: 3,
+        backendId: finalBackend.id,
+        backendUrl: finalBackend.backendUrl,
+      })
     );
   });
 
