@@ -147,6 +147,10 @@ export const usageLogs = pgTable(
     isStream: boolean("is_stream").default(false),
     durationMs: integer("duration_ms"),
     status: varchar("status", { length: 20 }),
+    // Snapshots intentionally have no foreign key: usage history must retain
+    // the selected backend even after that backend is removed or reconfigured.
+    backendId: uuid("backend_id"),
+    backendUrl: varchar("backend_url", { length: 500 }),
     promptPreview: text("prompt_preview"),
     clientIp: varchar("client_ip", { length: 45 }),
     createdAt: timestamp("created_at", { withTimezone: true }).default(
@@ -156,6 +160,10 @@ export const usageLogs = pgTable(
   (table) => [
     index("idx_usage_logs_user_created").on(table.userId, table.createdAt),
     index("idx_usage_logs_model_created").on(table.modelId, table.createdAt),
+    index("idx_usage_logs_backend_created").on(
+      table.backendId,
+      table.createdAt
+    ),
     index("idx_usage_logs_created_at").on(table.createdAt),
   ]
 );

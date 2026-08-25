@@ -21,6 +21,8 @@ function toCsv(logs: Array<{
   isStream: boolean | null;
   durationMs: number | null;
   status: string | null;
+  backendId: string | null;
+  backendUrl: string | null;
   promptPreview: string | null;
   clientIp: string | null;
   createdAt: Date | null;
@@ -37,6 +39,8 @@ function toCsv(logs: Array<{
     "stream",
     "duration_ms",
     "status",
+    "backend_id",
+    "backend_url",
     "prompt_preview",
     "client_ip",
   ];
@@ -53,6 +57,8 @@ function toCsv(logs: Array<{
       log.isStream ?? false,
       log.durationMs ?? "",
       log.status ?? "",
+      log.backendId ?? "",
+      log.backendUrl ?? "",
       log.promptPreview ?? "",
       log.clientIp ?? "",
     ]
@@ -74,6 +80,7 @@ export async function GET(req: NextRequest) {
   const endDate = searchParams.get("endDate");
   const userId = searchParams.get("userId");
   const modelId = searchParams.get("modelId");
+  const backendId = searchParams.get("backendId");
   const ip = searchParams.get("ip");
   const format = searchParams.get("format");
   const offset = (page - 1) * limit;
@@ -89,6 +96,7 @@ export async function GET(req: NextRequest) {
     );
   if (userId) conditions.push(eq(usageLogs.userId, userId));
   if (modelId) conditions.push(eq(usageLogs.modelId, modelId));
+  if (backendId) conditions.push(eq(usageLogs.backendId, backendId));
   if (ip) conditions.push(eq(usageLogs.clientIp, ip));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -106,6 +114,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        backendId: usageLogs.backendId,
+        backendUrl: usageLogs.backendUrl,
         promptPreview: usageLogs.promptPreview,
         clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,
@@ -148,6 +158,8 @@ export async function GET(req: NextRequest) {
         isStream: usageLogs.isStream,
         durationMs: usageLogs.durationMs,
         status: usageLogs.status,
+        backendId: usageLogs.backendId,
+        backendUrl: usageLogs.backendUrl,
         promptPreview: usageLogs.promptPreview,
         clientIp: usageLogs.clientIp,
         createdAt: usageLogs.createdAt,

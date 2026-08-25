@@ -340,6 +340,8 @@ export async function handleAnthropicProxy(
         isStream: true,
         durationMs,
         status: "success",
+        backendId: outcome.backend.id,
+        backendUrl: outcome.backend.backendUrl,
         promptPreview,
         clientIp,
       } as UsageRecord);
@@ -383,6 +385,8 @@ export async function handleAnthropicProxy(
       isStream: false,
       durationMs,
       status: "success",
+      backendId: outcome.backend.id,
+      backendUrl: outcome.backend.backendUrl,
       promptPreview,
       clientIp,
     } as UsageRecord);

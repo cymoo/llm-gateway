@@ -12,6 +12,8 @@ export interface UsageRecord {
   isStream: boolean;
   durationMs: number;
   status: "success" | "error";
+  backendId?: string | null;
+  backendUrl?: string | null;
   promptPreview?: string | null;
   clientIp?: string | null;
 }
@@ -40,6 +42,8 @@ export function recordUsage(record: UsageRecord): void {
         isStream: record.isStream,
         durationMs: record.durationMs,
         status: record.status,
+        backendId: record.backendId ?? null,
+        backendUrl: record.backendUrl ?? null,
         promptPreview: record.promptPreview ?? null,
         clientIp: record.clientIp ?? null,
       });
