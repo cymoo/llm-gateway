@@ -3,6 +3,7 @@
 一个基于 **Next.js 16** + **Drizzle ORM** + **PostgreSQL** 的 LLM 网关项目，提供：
 
 - 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`、`completions`、`embeddings`、`rerank`）
+- Anthropic 兼容的 Messages 与 Models API
 - 单个模型可挂多台上游后端，缓存亲和负载均衡 + 自动故障切换
 - 公开自助注册（`/register`）+ 管理员审批流程
 - 用户与模型权限管理
@@ -124,6 +125,15 @@ Backend 筛选条件同时作用于分页日志表和 CSV 导出。每条日志�
 ```bash
 npm run migrate
 ```
+
+## Anthropic 兼容 API
+
+将 `/api/anthropic` 设为 Anthropic Base URL。网关同时接受 `x-api-key` 或携带网关用户密钥的 `Authorization: Bearer`。
+
+- `POST /api/anthropic/v1/messages` — Messages API 代理
+- `GET /api/anthropic/v1/models` — Anthropic 格式的已授权 chat 模型列表
+
+Models 接口支持标准的 `limit`、`after_id`、`before_id` 查询参数；配置的后端声明上下文窗口时会返回 `max_input_tokens`。
 
 ## 常用命令
 

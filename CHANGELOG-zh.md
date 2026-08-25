@@ -4,6 +4,14 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 2026-08-25
+
+### ✨ Anthropic Models API 兼容
+
+- **Anthropic 兼容模型列表** — `GET /api/anthropic/v1/models` 现在按 Anthropic Models API 官方响应格式返回调用者已授权的 chat 模型。接口同时接受 `x-api-key` 和 Bearer 鉴权，并支持 `limit`、`after_id`、`before_id` 分页。
+- **共享授权模型目录** — OpenAI 与 Anthropic 模型列表现在复用同一套授权和上下文窗口探测逻辑，确保分组/个人模型可见性及多后端安全最小上下文窗口在两种协议间一致。
+- 活跃后端声明上下文窗口时返回 `max_input_tokens`；由于 Anthropic 兼容层当前只提供 Messages API，不会列出 embedding/rerank 别名。本版本无需数据库迁移。
+
 ## [0.5.0] - 2026-08-25
 
 ### ✨ 后端用量可观测性
