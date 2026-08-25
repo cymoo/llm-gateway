@@ -10,6 +10,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 ## Features
 
 - Unified OpenAI-compatible proxy endpoints — `chat.completions`, `completions`, `embeddings`, and `rerank`
+- Anthropic-compatible Messages and Models API endpoints
 - Multiple upstream backends per model with cache-affinity load balancing and automatic failover
 - Public self-registration (`/register`) with admin approval workflow
 - User and model access management
@@ -142,6 +143,15 @@ After upgrading to 0.5.0, apply migration `0008_last_ted_forrester.sql`:
 ```bash
 npm run migrate
 ```
+
+## Anthropic-compatible API
+
+Use `/api/anthropic` as the Anthropic base URL. The gateway accepts either `x-api-key` or `Authorization: Bearer` with a gateway user key.
+
+- `POST /api/anthropic/v1/messages` — Messages API proxy
+- `GET /api/anthropic/v1/models` — authorized chat models in Anthropic format
+
+The Models endpoint supports the standard `limit`, `after_id`, and `before_id` query parameters. It returns `max_input_tokens` when the configured backends advertise a context window.
 
 ## Scripts
 

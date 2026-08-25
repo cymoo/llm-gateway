@@ -325,7 +325,18 @@ Body:  { "model": "qwen3", ... }   ← alias 替换为 backend_model
 | 后端不可用 | 502 | `server_error` | `backend_unavailable` |
 | 后端超时 | 504 | `server_error` | `backend_timeout` |
 
-### 4.2 管理后台 API（`/api/admin/*`）
+### 4.2 Anthropic 兼容接口（`/api/anthropic/*`）
+
+同时接受 `x-api-key: sk-xxxxx` 与 `Authorization: Bearer sk-xxxxx` 认证。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/anthropic/v1/messages` | Messages API（支持流式响应与缓存亲和路由） |
+| `GET` | `/api/anthropic/v1/models` | Anthropic 格式的已授权 chat 模型列表 |
+
+模型列表支持 `limit`（1–1000，默认 20）、`after_id`、`before_id` 游标分页，响应包含 `data`、`has_more`、`first_id` 和 `last_id`。模型条目使用公共 alias 作为 `id`/`display_name`；后端可探测上下文窗口时返回安全最小值 `max_input_tokens`。OpenAI 与 Anthropic 列表共享同一授权模型目录，避免权限结果漂移。
+
+### 4.3 管理后台 API（`/api/admin/*`）
 
 所有请求通过 JWT cookie 认证，仅 `is_admin=true` 的用户可访问。
 

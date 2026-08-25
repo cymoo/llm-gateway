@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-08-25
+
+### Added: Anthropic Models API Compatibility
+
+- **Anthropic-compatible model listing** — `GET /api/anthropic/v1/models` now returns the caller's authorized chat models using the official Anthropic Models API response shape. It accepts both `x-api-key` and Bearer authentication and supports `limit`, `after_id`, and `before_id` pagination.
+- **Shared authorized model catalog** — OpenAI and Anthropic model-list endpoints now share one authorization and context-window discovery implementation, keeping group/personal model visibility and the safe minimum backend context window consistent across protocols.
+- The release advertises `max_input_tokens` when active backends expose a context window and omits embedding/rerank aliases because the Anthropic-compatible surface currently serves Messages models only. No database migration is required.
+
 ## [0.5.0] - 2026-08-25
 
 ### Added: Backend Usage Observability
