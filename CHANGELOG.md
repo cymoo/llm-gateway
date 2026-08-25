@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-25
+
+### Added: Backend Usage Observability
+
+- **Final backend snapshots in usage logs** — successful OpenAI- and Anthropic-compatible requests now record the ID and URL of the backend that actually returned the response. This is the final backend after failover, so the log reflects where traffic really landed rather than only the initial routing choice. Snapshots deliberately have no foreign key, preserving historical evidence after a backend is removed or reconfigured.
+- **Backend visibility and filtering in the admin console** — the Request Logs tab at `/admin/usage` now shows a Backend column, exposes the full backend URL and ID in log details, and provides a searchable backend filter scoped to the selected model. Pagination and CSV exports honor the same filter, and CSV output includes `backend_id` and `backend_url`.
+- **Database migration required** — migration `0008_last_ted_forrester.sql` adds nullable `backend_id` and `backend_url` columns plus an index for backend/time queries. Existing usage records remain valid and display no backend. Run `npm run migrate` after deploying this release.
+
+### Fixed
+
+- Invalid `backendId` filters now return `400` instead of surfacing a PostgreSQL UUID parsing error as `500`.
+
 ## [0.4.4] - 2026-08-11
 
 ### 🐛 Bug Fixes

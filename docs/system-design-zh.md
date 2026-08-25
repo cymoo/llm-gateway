@@ -199,13 +199,18 @@ CREATE TABLE usage_logs (
     -- SET NULL：删除用户后用量记录以匿名形式保留，历史统计保持准确
     user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
     model_id            UUID REFERENCES models(id),
-    request_type        VARCHAR(50) NOT NULL,     -- "chat.completions" | "completions" | "embeddings"
+    request_type        VARCHAR(50) NOT NULL,     -- chat.completions | completions | embeddings | rerank
     prompt_tokens       INT DEFAULT 0,
     completion_tokens   INT DEFAULT 0,
     total_tokens        INT DEFAULT 0,
     is_stream           BOOLEAN DEFAULT false,
     duration_ms         INT,
     status              VARCHAR(20),              -- "success" | "error"
+    -- 最终成功后端的历史快照；不设外键，后端删除/改址后仍可追溯
+    backend_id          UUID,
+    backend_url         VARCHAR(500),
+    prompt_preview      TEXT,
+    client_ip           VARCHAR(45),
     created_at          TIMESTAMPTZ DEFAULT now()
 );
 
@@ -230,6 +235,7 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_models_alias ON models(alias);
 CREATE INDEX idx_usage_logs_user_created ON usage_logs(user_id, created_at);
 CREATE INDEX idx_usage_logs_model_created ON usage_logs(model_id, created_at);
+CREATE INDEX idx_usage_logs_backend_created ON usage_logs(backend_id, created_at);
 CREATE INDEX idx_daily_usage_user_model_date ON daily_usage(user_id, model_id, date);
 ```
 
@@ -370,7 +376,7 @@ Body:  { "model": "qwen3", ... }   ← alias 替换为 backend_model
 | `GET` | `/api/admin/usage/by-user` | 按用户统计 |
 | `GET` | `/api/admin/usage/by-model` | 按模型统计 |
 | `GET` | `/api/admin/usage/by-user/{id}` | 单个用户的详细用量 |
-| `GET` | `/api/admin/usage/logs` | 请求日志列表（分页） |
+| `GET` | `/api/admin/usage/logs` | 请求日志列表（分页；支持 `backendId` 筛选与 CSV 导出） |
 
 ---
 
@@ -609,7 +615,10 @@ PROXY_TIMEOUT_STREAM=600000
 - 日期范围选择器
 - **按用户统计 Tab**：表格（用户名、总请求数、总 Token、按模型明细展开）
 - **按模型统计 Tab**：表格（模型别名、总请求数、总 Token、按用户明细展开）
-- **请求日志 Tab**：分页表格（时间、用户、模型、类型、Token 数、耗时、状态）
+- **请求日志 Tab**：分页表格（时间、用户、模型、最终 Backend、类型、Token 数、耗时、状态）
+  - Backend 下拉框随模型筛选联动，并应用于分页和 CSV 导出
+  - 记录的是故障切换后最终成功响应的后端；历史 URL 使用请求发生时的快照
+  - 旧日志没有后端快照时显示为空，不影响其余统计
 
 ---
 

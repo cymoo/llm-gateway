@@ -4,6 +4,18 @@
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 2026-08-25
+
+### ✨ 后端用量可观测性
+
+- **用量日志记录最终后端快照** — OpenAI 与 Anthropic 兼容请求成功后，现在会记录真正返回响应的后端 ID 和 URL。发生故障切换时记录的是最终成功后端，因此日志反映流量实际落点，而不只是最初路由选择。快照刻意不建立外键，后端被删除或重新配置后历史证据仍可保留。
+- **管理后台展示并筛选后端** — `/admin/usage` 的「请求日志」Tab 新增 Backend 列，日志详情展示完整后端 URL 和 ID，并提供随模型联动的可搜索后端筛选器。分页和 CSV 导出应用同一筛选条件，CSV 同时新增 `backend_id` 与 `backend_url`。
+- **需要执行数据库迁移** — `0008_last_ted_forrester.sql` 新增可空的 `backend_id`、`backend_url` 字段及后端/时间索引。已有日志继续有效，后端显示为空。部署本版本后请运行 `npm run migrate`。
+
+### 🐛 问题修复
+
+- 非法 `backendId` 筛选值现在返回 `400`，不再因 PostgreSQL UUID 解析错误而变成 `500`。
+
 ## [0.4.4] - 2026-08-11
 
 ### 🐛 问题修复

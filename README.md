@@ -14,7 +14,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 - Public self-registration (`/register`) with admin approval workflow
 - User and model access management
 - Quota and rate limiting per user/model
-- Usage analytics (logs and daily statistics)
+- Usage analytics with per-backend request logs, filtering, CSV export, and daily statistics
 - Admin console for managing users and models
 
 ## Tech Stack
@@ -130,6 +130,18 @@ If an admin user already exists (`is_admin=true`), no duplicate admin will be cr
 - Newly registered users are created as inactive and cannot use API endpoints yet.
 - Admins can review users in `/admin/users` and click **Approve**.
 - Approval calls `POST /api/admin/users/:id/approve`, which activates the account.
+
+## Backend Usage Observability
+
+The admin Request Logs tab at `/admin/usage?tab=logs` records and displays the final upstream backend for every successful request. For cache-affinity traffic, compare independent conversations rather than turns within one conversation: the same conversation is intentionally pinned to one backend. Embedding and rerank requests use round-robin routing.
+
+The Backend filter applies to both the paginated log table and CSV exports. Each record stores backend ID and URL snapshots, so it remains attributable after the configured backend changes. Logs created before version 0.5.0 show no backend value.
+
+After upgrading to 0.5.0, apply migration `0008_last_ted_forrester.sql`:
+
+```bash
+npm run migrate
+```
 
 ## Scripts
 
