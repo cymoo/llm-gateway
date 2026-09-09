@@ -32,6 +32,8 @@ export async function GET(req: NextRequest, { params }: Params) {
     .where(eq(users.id, id))
     .limit(1);
 
+  if (!targetUser) return notFoundResponse("User not found");
+
   const rows = await db
     .select({
       model: models,

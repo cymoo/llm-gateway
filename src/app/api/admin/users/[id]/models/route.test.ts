@@ -42,6 +42,21 @@ describe("GET /api/admin/users/[id]/models", () => {
     mockGetAdminUser.mockResolvedValue({ userId: "admin-1" });
   });
 
+  it("returns 404 when the target user does not exist", async () => {
+    mockSelect.mockImplementation(() => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    }));
+
+    const res = await GET({} as never, params);
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "User not found" });
+  });
+
   it("returns the strictest effective quota for an overlapping model", async () => {
     const personalRow = {
       model: {

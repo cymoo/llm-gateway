@@ -220,15 +220,22 @@ export async function checkQuota(
   );
 
   const currentTime = getCurrentTimeStr();
-  for (const window of effective.allowedTimeWindows) {
-    if (!isWithinAllowedWindow(currentTime, window)) {
-      return makeProxyError(
-        `Access is only allowed between ${window.start} and ${window.end}`,
-        "permission_error",
-        "time_restricted",
-        403
-      );
-    }
+  const isTimeAllowed = effective.allowedTimeWindows.every((window) =>
+    isWithinAllowedWindow(currentTime, window),
+  );
+  if (!isTimeAllowed) {
+    const [onlyWindow] = effective.allowedTimeWindows;
+    const windows = effective.allowedTimeWindows
+      .map((window) => `${window.start}–${window.end}`)
+      .join(" ∩ ");
+    return makeProxyError(
+      effective.allowedTimeWindows.length === 1
+        ? `Access is only allowed between ${onlyWindow.start} and ${onlyWindow.end}`
+        : `Access is only allowed during all configured time windows: ${windows}`,
+      "permission_error",
+      "time_restricted",
+      403
+    );
   }
 
   if (effective.maxRequestsPerMin !== null) {
