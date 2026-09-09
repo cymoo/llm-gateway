@@ -168,9 +168,13 @@ export async function handleAnthropicProxy(
 
   const model = modelRows[0];
 
-  // 4. Authorize
+  // 4. Authorize — match the OpenAI-compatible route: group and personal
+  // grants form a union, and overlapping quota sources are both retained.
   const isDefaultGroup = !group || group.isDefault;
   let authorized = false;
+  let quotaAccess: import("@/lib/quota/checker").QuotaAccess = {
+    viaUser: false,
+  };
 
   if (isDefaultGroup) {
     const authRows = await db
@@ -181,18 +185,34 @@ export async function handleAnthropicProxy(
       )
       .limit(1);
     authorized = authRows.length > 0;
+    quotaAccess = { viaUser: authorized };
   } else {
-    const authRows = await db
-      .select()
-      .from(groupModels)
-      .where(
-        and(
-          eq(groupModels.groupId, group.id),
-          eq(groupModels.modelId, model.id),
-        ),
-      )
-      .limit(1);
-    authorized = authRows.length > 0;
+    const [groupAuthRows, userAuthRows] = await Promise.all([
+      db
+        .select()
+        .from(groupModels)
+        .where(
+          and(
+            eq(groupModels.groupId, group.id),
+            eq(groupModels.modelId, model.id),
+          ),
+        )
+        .limit(1),
+      db
+        .select()
+        .from(userModels)
+        .where(
+          and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)),
+        )
+        .limit(1),
+    ]);
+    const viaGroup = groupAuthRows.length > 0;
+    const viaUser = userAuthRows.length > 0;
+    authorized = viaGroup || viaUser;
+    quotaAccess = {
+      viaUser,
+      groupId: viaGroup ? group.id : undefined,
+    };
   }
 
   if (!authorized) {
@@ -208,9 +228,7 @@ export async function handleAnthropicProxy(
     userId: user.id,
     modelId: model.id,
     modelAlias: model.alias,
-    quotaSource: isDefaultGroup
-      ? { type: "user" }
-      : { type: "group", groupId: group.id },
+    access: quotaAccess,
     defaultMaxTokensPerDay: model.defaultMaxTokensPerDay ?? null,
     defaultMaxRequestsPerDay: model.defaultMaxRequestsPerDay ?? null,
     defaultMaxRequestsPerMin: model.defaultMaxRequestsPerMin ?? null,

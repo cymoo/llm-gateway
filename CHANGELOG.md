@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-09-09
+
+### Fixed
+
+- **Overlapping group and personal quotas now use the stricter limit** — when a non-default group and a user both grant the same model, numeric quotas are combined field-by-field using the lower configured value and every configured access window must allow the request. Model defaults remain the fallback when neither applicable source configures a field. The user dashboard and admin user detail page show the same effective quota enforced by the proxy.
+- **Anthropic authorization now matches OpenAI authorization** — non-default group users can use the union of group and personally granted models through both protocols. Previously the Anthropic-compatible Messages endpoint ignored personal-only model grants for these users.
+
+No database migration is required.
+
 ## [0.6.0] - 2026-08-25
 
 ### Added: Anthropic Models API Compatibility

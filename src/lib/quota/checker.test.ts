@@ -17,13 +17,19 @@ vi.mock("./rate-limiter", () => ({
   getRateLimiter: () => mockRateLimiter,
 }));
 
-import { checkQuota, QuotaContext } from "./checker";
+import {
+  checkQuota,
+  QuotaContext,
+  QuotaValues,
+  isWithinAllowedWindow,
+  resolveEffectiveQuota,
+} from "./checker";
 
 const baseCtx: QuotaContext = {
   userId: "user-1",
   modelId: "model-1",
   modelAlias: "gpt-test",
-  quotaSource: { type: "user" },
+  access: { viaUser: true },
   defaultMaxTokensPerDay: null,
   defaultMaxRequestsPerDay: null,
   defaultMaxRequestsPerMin: null,
@@ -47,7 +53,7 @@ describe("checkQuota", () => {
     mockRateLimiter.check.mockReturnValue(true);
   });
 
-  describe("user quotaSource", () => {
+  describe("user quota access", () => {
     it("returns null when no quota override and no model defaults", async () => {
       mockSelect.mockReturnValueOnce(makeSelectChain([])); // userModelQuotas: no row
       const result = await checkQuota(baseCtx);
@@ -99,10 +105,10 @@ describe("checkQuota", () => {
     });
   });
 
-  describe("group quotaSource", () => {
+  describe("group quota access", () => {
     const groupCtx: QuotaContext = {
       ...baseCtx,
-      quotaSource: { type: "group", groupId: "group-1" },
+      access: { viaUser: false, groupId: "group-1" },
     };
 
     it("queries groupModelQuotas instead of userModelQuotas", async () => {
@@ -148,6 +154,37 @@ describe("checkQuota", () => {
     });
   });
 
+  describe("overlapping group and personal quotas", () => {
+    const overlapCtx: QuotaContext = {
+      ...baseCtx,
+      access: { viaUser: true, groupId: "group-1" },
+    };
+
+    it("enforces the lower personal per-minute limit", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 100 }]))
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 5 }]));
+      mockRateLimiter.check.mockReturnValue(false);
+
+      const result = await checkQuota(overlapCtx);
+
+      expect(result?.status).toBe(429);
+      expect(mockRateLimiter.check).toHaveBeenCalledWith("user-1", "model-1", 5);
+    });
+
+    it("enforces the lower group daily limit", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 3 }]))
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 20 }]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 3, totalTokens: 0 }]));
+
+      const result = await checkQuota(overlapCtx);
+
+      expect(result?.status).toBe(429);
+      expect((await result!.json()).error.code).toBe("daily_request_limit");
+    });
+  });
+
   describe("rate limiting", () => {
     it("returns 429 when rate limiter rejects", async () => {
       mockSelect.mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: null, maxTokensPerDay: null, maxRequestsPerMin: 5, allowedTimeStart: null, allowedTimeEnd: null }]));
@@ -187,5 +224,89 @@ describe("checkQuota", () => {
         expect(body.error.code).toBe("time_restricted");
       }
     });
+  });
+});
+
+const emptyQuota: QuotaValues = {
+  maxTokensPerDay: null,
+  maxRequestsPerDay: null,
+  maxRequestsPerMin: null,
+  allowedTimeStart: null,
+  allowedTimeEnd: null,
+};
+
+describe("resolveEffectiveQuota", () => {
+  it("takes the strictest configured numeric value on overlap", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true, groupId: "group-1" },
+      { ...emptyQuota, maxRequestsPerMin: 20 },
+      { ...emptyQuota, maxRequestsPerMin: 5, maxTokensPerDay: 1_000 },
+      { ...emptyQuota, maxRequestsPerMin: 100, maxTokensPerDay: 500 },
+    );
+
+    expect(effective.maxRequestsPerMin).toBe(5);
+    expect(effective.maxTokensPerDay).toBe(500);
+  });
+
+  it("uses a configured source before the model default", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true, groupId: "group-1" },
+      { ...emptyQuota, maxRequestsPerMin: 20 },
+      { ...emptyQuota, maxRequestsPerMin: 100 },
+      emptyQuota,
+    );
+
+    expect(effective.maxRequestsPerMin).toBe(100);
+  });
+
+  it("falls back to the model default when neither source configures a field", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true, groupId: "group-1" },
+      { ...emptyQuota, maxRequestsPerDay: 10 },
+      emptyQuota,
+      emptyQuota,
+    );
+
+    expect(effective.maxRequestsPerDay).toBe(10);
+  });
+
+  it("keeps both time windows so callers enforce their intersection", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true, groupId: "group-1" },
+      emptyQuota,
+      { ...emptyQuota, allowedTimeStart: "09:00:00", allowedTimeEnd: "18:00:00" },
+      { ...emptyQuota, allowedTimeStart: "10:00:00", allowedTimeEnd: "16:00:00" },
+    );
+
+    expect(effective.allowedTimeWindows).toEqual([
+      { start: "09:00:00", end: "18:00:00", source: "user" },
+      { start: "10:00:00", end: "16:00:00", source: "group" },
+    ]);
+  });
+
+  it("normalizes a partial window to a safe open-ended range", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true },
+      emptyQuota,
+      { ...emptyQuota, allowedTimeStart: "09:00:00" },
+    );
+
+    expect(effective.allowedTimeWindows).toEqual([
+      { start: "09:00:00", end: "23:59:59", source: "user" },
+    ]);
+  });
+});
+
+describe("isWithinAllowedWindow", () => {
+  it("supports a window that crosses midnight", () => {
+    const window = {
+      start: "22:00:00",
+      end: "06:00:00",
+      source: "group" as const,
+    };
+
+    expect(isWithinAllowedWindow("23:00:00", window)).toBe(true);
+    expect(isWithinAllowedWindow("05:00:00", window)).toBe(true);
+    expect(isWithinAllowedWindow("12:00:00", window)).toBe(false);
   });
 });

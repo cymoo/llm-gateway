@@ -1,13 +1,22 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
-import { userModels, models, userModelQuotas, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  userModels,
+  models,
+  userModelQuotas,
+  users,
+  groups,
+  groupModels,
+  groupModelQuotas,
+} from "@/lib/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   getAdminUser,
   unauthorizedResponse,
   notFoundResponse,
 } from "@/app/api/admin/middleware";
 import { recordAudit } from "@/lib/audit/recorder";
+import { resolveEffectiveQuota } from "@/lib/quota/checker";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -16,6 +25,12 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!admin) return unauthorizedResponse();
 
   const { id } = await params;
+
+  const [targetUser] = await db
+    .select({ groupId: users.groupId })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
 
   const rows = await db
     .select({
@@ -34,7 +49,66 @@ export async function GET(req: NextRequest, { params }: Params) {
     )
     .where(eq(userModels.userId, id));
 
-  return Response.json(rows);
+  const [group] = targetUser?.groupId
+    ? await db
+        .select({ id: groups.id, isDefault: groups.isDefault })
+        .from(groups)
+        .where(eq(groups.id, targetUser.groupId))
+        .limit(1)
+    : [];
+  const modelIds = rows.map((row) => row.model.id);
+  const [groupGrants, groupQuotas] =
+    group && !group.isDefault && modelIds.length > 0
+      ? await Promise.all([
+          db
+            .select({ modelId: groupModels.modelId })
+            .from(groupModels)
+            .where(
+              and(
+                eq(groupModels.groupId, group.id),
+                inArray(groupModels.modelId, modelIds),
+              ),
+            ),
+          db
+            .select()
+            .from(groupModelQuotas)
+            .where(
+              and(
+                eq(groupModelQuotas.groupId, group.id),
+                inArray(groupModelQuotas.modelId, modelIds),
+              ),
+            ),
+        ])
+      : [[], []];
+  const groupModelIds = new Set(groupGrants.map((grant) => grant.modelId));
+  const groupQuotaMap = new Map(
+    groupQuotas.map((quota) => [quota.modelId, quota]),
+  );
+
+  return Response.json(
+    rows.map((row) => {
+      const overlapsGroup = groupModelIds.has(row.model.id);
+      return {
+        ...row,
+        overlapsGroup,
+        effectiveQuota: resolveEffectiveQuota(
+          {
+            viaUser: true,
+            groupId: overlapsGroup ? group?.id : undefined,
+          },
+          {
+            maxTokensPerDay: row.model.defaultMaxTokensPerDay ?? null,
+            maxRequestsPerDay: row.model.defaultMaxRequestsPerDay ?? null,
+            maxRequestsPerMin: row.model.defaultMaxRequestsPerMin ?? null,
+            allowedTimeStart: row.model.defaultAllowedTimeStart ?? null,
+            allowedTimeEnd: row.model.defaultAllowedTimeEnd ?? null,
+          },
+          row.quota ?? undefined,
+          groupQuotaMap.get(row.model.id),
+        ),
+      };
+    }),
+  );
 }
 
 export async function POST(req: NextRequest, { params }: Params) {

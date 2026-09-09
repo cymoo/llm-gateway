@@ -242,10 +242,18 @@ CREATE INDEX idx_daily_usage_user_model_date ON daily_usage(user_id, model_id, d
 ### 3.3 限额检查优先级
 
 ```
-user_model_quotas 有记录？
-    ├── 是 → 使用 user_model_quotas 中的值
-    └── 否 → 使用 models 表中的 default_* 值（即模板）
-              └── 也为 NULL → 不限制
+默认分组用户：
+    └── 使用个人模型配额；未配置的字段回退 models.default_*
+
+非默认分组用户：
+    ├── 仅个人授权 → 使用个人配额
+    ├── 仅分组授权 → 使用分组配额
+    └── 个人与分组重复授权
+          ├── 数值配额逐字段取已配置值中的较小值
+          └── 时间窗口必须同时满足（取交集）
+
+所有适用来源都未配置某字段 → 回退 models.default_*
+models.default_* 也为 NULL → 不限制
 ```
 
 ### 3.4 初始管理员 Seed
@@ -413,12 +421,14 @@ Body:  { "model": "qwen3", ... }   ← alias 替换为 backend_model
 │     未找到 → 404 model_not_found
 │
 ├─ 4. 权限检查
-│     SELECT 1 FROM user_models WHERE user_id = $1 AND model_id = $2
-│     未找到 → 403 model_not_allowed
+│     默认分组：检查 user_models
+│     非默认分组：group_models 与 user_models 取并集
+│     两边都未找到 → 403 model_not_allowed
 │
 ├─ 5. 限额检查（按顺序）
 │     a. 时间窗口检查
-│        获取限额配置（优先 user_model_quotas，fallback models.default_*）
+│        获取所有适用的个人/分组限额；重复授权时同时满足所有窗口
+│        所有来源均未配置时 fallback models.default_*
 │        当前时间不在 [allowed_time_start, allowed_time_end] 内
 │        → 403 time_restricted
 │

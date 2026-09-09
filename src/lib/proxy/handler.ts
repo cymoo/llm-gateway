@@ -194,10 +194,13 @@ export async function handleProxy(
     );
   }
 
-  // 4. Authorize — group models take precedence; user's own models are also valid
+  // 4. Authorize — group and personal model grants form a union. Preserve both
+  // matching sources so overlapping quotas can be combined safely.
   const isDefaultGroup = !group || group.isDefault;
   let authorized = false;
-  let quotaSource: import("@/lib/quota/checker").QuotaSource = { type: "user" };
+  let quotaAccess: import("@/lib/quota/checker").QuotaAccess = {
+    viaUser: false,
+  };
 
   if (isDefaultGroup) {
     const authRows = await db
@@ -208,35 +211,34 @@ export async function handleProxy(
       )
       .limit(1);
     authorized = authRows.length > 0;
-    quotaSource = { type: "user" };
+    quotaAccess = { viaUser: authorized };
   } else {
-    // Check group first (higher priority)
-    const groupAuthRows = await db
-      .select()
-      .from(groupModels)
-      .where(
-        and(
-          eq(groupModels.groupId, group.id),
-          eq(groupModels.modelId, model.id),
-        ),
-      )
-      .limit(1);
-
-    if (groupAuthRows.length > 0) {
-      authorized = true;
-      quotaSource = { type: "group", groupId: group.id };
-    } else {
-      // Fall back to user's own model list
-      const userAuthRows = await db
+    const [groupAuthRows, userAuthRows] = await Promise.all([
+      db
+        .select()
+        .from(groupModels)
+        .where(
+          and(
+            eq(groupModels.groupId, group.id),
+            eq(groupModels.modelId, model.id),
+          ),
+        )
+        .limit(1),
+      db
         .select()
         .from(userModels)
         .where(
           and(eq(userModels.userId, user.id), eq(userModels.modelId, model.id)),
         )
-        .limit(1);
-      authorized = userAuthRows.length > 0;
-      quotaSource = { type: "user" };
-    }
+        .limit(1),
+    ]);
+    const viaGroup = groupAuthRows.length > 0;
+    const viaUser = userAuthRows.length > 0;
+    authorized = viaGroup || viaUser;
+    quotaAccess = {
+      viaUser,
+      groupId: viaGroup ? group.id : undefined,
+    };
   }
 
   if (!authorized) {
@@ -253,7 +255,7 @@ export async function handleProxy(
     userId: user.id,
     modelId: model.id,
     modelAlias: model.alias,
-    quotaSource,
+    access: quotaAccess,
     defaultMaxTokensPerDay: model.defaultMaxTokensPerDay ?? null,
     defaultMaxRequestsPerDay: model.defaultMaxRequestsPerDay ?? null,
     defaultMaxRequestsPerMin: model.defaultMaxRequestsPerMin ?? null,

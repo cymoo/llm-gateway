@@ -140,11 +140,12 @@ const en = {
     enterNewPwd: "Enter new password",
     selectGroup: "Select group…",
     groupManagedNote:
-      "User belongs to group {group}. Group models take priority; personal models below are also active.",
+      "User belongs to group {group}. Personal and group access both apply, with the stricter quota used on overlap.",
     modelInheritedNote:
       "Model access is inherited from group {group}. Shown below for reference only.",
     modelMergedNote:
-      "User belongs to group {group}. Group models take priority for quota; personal models listed here are also active.",
+      "User belongs to group {group}. Personal and group model access are combined; overlapping quotas both apply, using the stricter limit.",
+    effectiveValue: "Effective: {value}",
     editInGroup: "Edit in Group",
     noModelsAuthorized: "No models authorized yet",
     selectModel: "Select model…",

@@ -62,6 +62,17 @@ interface AuthorizedModel {
     allowedTimeStart: string | null;
     allowedTimeEnd: string | null;
   } | null;
+  overlapsGroup: boolean;
+  effectiveQuota: {
+    maxTokensPerDay: number | null;
+    maxRequestsPerDay: number | null;
+    maxRequestsPerMin: number | null;
+    allowedTimeWindows: Array<{
+      start: string;
+      end: string;
+      source: "user" | "group" | "model";
+    }>;
+  };
 }
 
 interface AvailableModel {
@@ -767,18 +778,50 @@ function UserDetailContent() {
                         <>
                           <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">
                             {am.quota?.maxTokensPerDay?.toLocaleString() || "—"}
+                            {am.overlapsGroup && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                {t("users.effectiveValue", {
+                                  value: am.effectiveQuota.maxTokensPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                })}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">
                             {am.quota?.maxRequestsPerDay || "—"}
+                            {am.overlapsGroup && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                {t("users.effectiveValue", {
+                                  value: am.effectiveQuota.maxRequestsPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                })}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">
                             {am.quota?.maxRequestsPerMin || "—"}
+                            {am.overlapsGroup && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                {t("users.effectiveValue", {
+                                  value: am.effectiveQuota.maxRequestsPerMin?.toLocaleString() ?? t("common.unlimited"),
+                                })}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-4 text-slate-500 dark:text-slate-400">
                             {am.quota?.allowedTimeStart &&
                             am.quota?.allowedTimeEnd
                               ? `${am.quota.allowedTimeStart}–${am.quota.allowedTimeEnd}`
                               : "—"}
+                            {am.overlapsGroup && (
+                              <div className="text-xs text-blue-600 dark:text-blue-400">
+                                {t("users.effectiveValue", {
+                                  value: am.effectiveQuota.allowedTimeWindows.length > 0
+                                    ? am.effectiveQuota.allowedTimeWindows
+                                        .map((window) => `${window.start}–${window.end}`)
+                                        .join(" ∩ ")
+                                    : t("userDashboard.allDay"),
+                                })}
+                              </div>
+                            )}
                           </td>
                           <td className="py-2.5 px-4">
                             <div className="flex gap-1 justify-end">
