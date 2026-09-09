@@ -224,6 +224,38 @@ describe("checkQuota", () => {
         expect(body.error.code).toBe("time_restricted");
       }
     });
+
+    it("lists every applicable window when their intersection rejects", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 0, 1, 17, 0, 0));
+      mockSelect
+        .mockReturnValueOnce(
+          makeSelectChain([{
+            allowedTimeStart: "10:00:00",
+            allowedTimeEnd: "16:00:00",
+          }]),
+        )
+        .mockReturnValueOnce(
+          makeSelectChain([{
+            allowedTimeStart: "09:00:00",
+            allowedTimeEnd: "18:00:00",
+          }]),
+        );
+
+      try {
+        const result = await checkQuota({
+          ...baseCtx,
+          access: { viaUser: true, groupId: "group-1" },
+        });
+        const body = await result!.json();
+
+        expect(result?.status).toBe(403);
+        expect(body.error.message).toContain("09:00:00–18:00:00");
+        expect(body.error.message).toContain("10:00:00–16:00:00");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
 
