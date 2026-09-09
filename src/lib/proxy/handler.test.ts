@@ -116,6 +116,51 @@ describe("handleProxy prompt preview", () => {
   });
 });
 
+describe("handleProxy overlapping authorization", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _resetRoundRobin();
+    mockCheckQuota.mockResolvedValue(null);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ usage: { total_tokens: 1 } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+  });
+
+  it("passes both group and personal sources to quota enforcement", async () => {
+    setupDb([
+      [{ id: "user-1", isActive: true, groupId: "group-1" }],
+      [{ id: "group-1", isDefault: false }],
+      [{ id: "model-1", alias: "gpt-test" }],
+      [{ groupId: "group-1", modelId: "model-1" }],
+      [{ userId: "user-1", modelId: "model-1" }],
+      [defaultBackend],
+    ]);
+    const req = {
+      headers: new Headers({ authorization: "Bearer test-key" }),
+      json: async () => ({
+        model: "gpt-test",
+        messages: [{ role: "user", content: "hi" }],
+        stream: false,
+      }),
+    };
+
+    const res = await handleProxy(req as never, "chat.completions");
+
+    expect(res.status).toBe(200);
+    expect(mockCheckQuota).toHaveBeenCalledWith(
+      expect.objectContaining({
+        access: { viaUser: true, groupId: "group-1" },
+      }),
+    );
+  });
+});
+
 describe("handleProxy multi-backend", () => {
   const backend1 = {
     ...defaultBackend,

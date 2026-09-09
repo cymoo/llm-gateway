@@ -87,4 +87,46 @@ describe("GET /api/auth/dashboard", () => {
     expect(aliases).toContain("model-b");
     expect(body.models).toHaveLength(2);
   });
+
+  it("shows the strictest effective quota for an overlapping model", async () => {
+    setupDb((table) => {
+      if (table === users)
+        return [{ id: "user-1", name: "U", email: "u@e", apiKey: "k", isAdmin: false, groupId: "group-1" }];
+      if (table === groups)
+        return [{ id: "group-1", name: "G", isDefault: false }];
+      if (table === groupModels || table === userModels)
+        return [modelColumns("model-a")];
+      if (table === groupModelQuotas)
+        return [{
+          modelId: "model-a",
+          maxTokensPerDay: null,
+          maxRequestsPerDay: null,
+          maxRequestsPerMin: 100,
+          allowedTimeStart: "10:00:00",
+          allowedTimeEnd: "16:00:00",
+        }];
+      if (table === userModelQuotas)
+        return [{
+          modelId: "model-a",
+          maxTokensPerDay: null,
+          maxRequestsPerDay: null,
+          maxRequestsPerMin: 5,
+          allowedTimeStart: "09:00:00",
+          allowedTimeEnd: "18:00:00",
+        }];
+      if (table === dailyUsage)
+        return [{ totalTokens: 0, requestCount: 0, date: "2026-06-30", modelId: null }];
+      return [];
+    });
+
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(body.models).toHaveLength(1);
+    expect(body.models[0].quota.maxRequestsPerMin).toBe(5);
+    expect(body.models[0].quota.allowedTimeWindows).toEqual([
+      { start: "09:00:00", end: "18:00:00", source: "user" },
+      { start: "10:00:00", end: "16:00:00", source: "group" },
+    ]);
+  });
 });

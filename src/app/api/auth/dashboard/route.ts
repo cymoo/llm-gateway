@@ -12,6 +12,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { getAuthUser, unauthorizedResponse } from "@/app/api/auth/middleware";
+import { resolveEffectiveQuota } from "@/lib/quota/checker";
 
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req);
@@ -82,8 +83,8 @@ export async function GET(req: NextRequest) {
   const isDefaultGroup = !group || group.isDefault;
 
   // Fetch accessible models: the union of the group's models (for a non-default
-  // group) and the user's own authorized models. Group membership takes
-  // precedence on overlap, matching proxy authorization (see lib/proxy/handler.ts).
+  // group) and the user's own authorized models. Retain both sources on
+  // overlap so the dashboard shows the same effective quota as the proxy.
   type ModelRow = {
     modelId: string;
     alias: string;
@@ -93,7 +94,8 @@ export async function GET(req: NextRequest) {
     defaultMaxRequestsPerMin: number | null;
     defaultAllowedTimeStart: string | null;
     defaultAllowedTimeEnd: string | null;
-    source: "group" | "user";
+    viaGroup: boolean;
+    viaUser: boolean;
   };
 
   const modelColumns = {
@@ -107,7 +109,7 @@ export async function GET(req: NextRequest) {
     defaultAllowedTimeEnd: models.defaultAllowedTimeEnd,
   };
 
-  type ModelColumnRow = Omit<ModelRow, "source">;
+  type ModelColumnRow = Omit<ModelRow, "viaGroup" | "viaUser">;
 
   const [groupModelRows, userModelRows] = await Promise.all([
     !isDefaultGroup && group
@@ -126,19 +128,19 @@ export async function GET(req: NextRequest) {
 
   const modelMap = new Map<string, ModelRow>();
   for (const m of groupModelRows) {
-    modelMap.set(m.modelId, { ...m, source: "group" });
+    modelMap.set(m.modelId, { ...m, viaGroup: true, viaUser: false });
   }
   for (const m of userModelRows) {
-    if (!modelMap.has(m.modelId)) {
-      modelMap.set(m.modelId, { ...m, source: "user" });
-    }
+    const existing = modelMap.get(m.modelId);
+    modelMap.set(m.modelId, existing
+      ? { ...existing, viaUser: true }
+      : { ...m, viaGroup: false, viaUser: true });
   }
   const authorizedModels = Array.from(modelMap.values());
 
   const modelIds = authorizedModels.map((m) => m.modelId);
 
-  // Fetch quota overrides from both sources; each model uses the override that
-  // matches the source it was authorized through (group quotas win on overlap).
+  // Fetch quota overrides from both sources for strictest-wins resolution.
   type QuotaRow = {
     modelId: string | null;
     maxTokensPerDay: number | null;
@@ -244,23 +246,35 @@ export async function GET(req: NextRequest) {
     .filter((s) => s.totalTokens > 0 || s.requestCount > 0);
 
   const modelsWithQuotas = authorizedModels.map((m) => {
-    const override =
-      m.source === "group"
-        ? groupQuotaMap.get(m.modelId)
-        : userQuotaMap.get(m.modelId);
+    const effective = resolveEffectiveQuota(
+      {
+        viaUser: m.viaUser,
+        groupId: m.viaGroup && group ? group.id : undefined,
+      },
+      {
+        maxTokensPerDay: m.defaultMaxTokensPerDay,
+        maxRequestsPerDay: m.defaultMaxRequestsPerDay,
+        maxRequestsPerMin: m.defaultMaxRequestsPerMin,
+        allowedTimeStart: m.defaultAllowedTimeStart,
+        allowedTimeEnd: m.defaultAllowedTimeEnd,
+      },
+      userQuotaMap.get(m.modelId),
+      groupQuotaMap.get(m.modelId),
+    );
     const usage = usageMap.get(m.modelId);
+    const singleWindow = effective.allowedTimeWindows.length === 1
+      ? effective.allowedTimeWindows[0]
+      : null;
     return {
       alias: m.alias,
       isActive: m.isActive,
       quota: {
-        maxTokensPerDay: override?.maxTokensPerDay ?? m.defaultMaxTokensPerDay,
-        maxRequestsPerDay:
-          override?.maxRequestsPerDay ?? m.defaultMaxRequestsPerDay,
-        maxRequestsPerMin:
-          override?.maxRequestsPerMin ?? m.defaultMaxRequestsPerMin,
-        allowedTimeStart:
-          override?.allowedTimeStart ?? m.defaultAllowedTimeStart,
-        allowedTimeEnd: override?.allowedTimeEnd ?? m.defaultAllowedTimeEnd,
+        maxTokensPerDay: effective.maxTokensPerDay,
+        maxRequestsPerDay: effective.maxRequestsPerDay,
+        maxRequestsPerMin: effective.maxRequestsPerMin,
+        allowedTimeStart: singleWindow?.start ?? null,
+        allowedTimeEnd: singleWindow?.end ?? null,
+        allowedTimeWindows: effective.allowedTimeWindows,
       },
       todayUsage: {
         totalTokens: usage?.totalTokens ?? 0,

@@ -52,6 +52,11 @@ interface ModelInfo {
     maxRequestsPerMin: number | null;
     allowedTimeStart: string | null;
     allowedTimeEnd: string | null;
+    allowedTimeWindows: Array<{
+      start: string;
+      end: string;
+      source: "user" | "group" | "model";
+    }>;
   };
   todayUsage: {
     totalTokens: number;
@@ -619,8 +624,10 @@ with client.messages.stream(
                           {model.quota.maxRequestsPerMin ?? <span className="text-slate-400">∞</span>}
                         </td>
                         <td className="py-3 px-4 text-slate-500 dark:text-slate-400 text-xs">
-                          {model.quota.allowedTimeStart && model.quota.allowedTimeEnd
-                            ? `${model.quota.allowedTimeStart} – ${model.quota.allowedTimeEnd}`
+                          {model.quota.allowedTimeWindows.length > 0
+                            ? model.quota.allowedTimeWindows
+                                .map((window) => `${window.start} – ${window.end}`)
+                                .join(" ∩ ")
                             : t("userDashboard.allDay")}
                         </td>
                       </tr>
