@@ -5,15 +5,11 @@ import {
   groups,
   models,
   userModels,
-  userModelQuotas,
   groupModels,
-  groupModelQuotas,
   dailyUsage,
 } from "@/lib/db/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { getAuthUser, unauthorizedResponse } from "@/app/api/auth/middleware";
-import { resolveEffectiveQuota } from "@/lib/quota/checker";
-import { getGroupDailyUsage } from "@/lib/quota/group-usage";
 import { getTodayStr } from "@/lib/usage/date";
 
 export async function GET(req: NextRequest) {
@@ -84,34 +80,18 @@ export async function GET(req: NextRequest) {
   const group = groupRows[0];
   const isDefaultGroup = !group || group.isDefault;
 
-  // Fetch accessible models: the union of the group's models (for a non-default
-  // group) and the user's own authorized models. Retain both sources on
-  // overlap so the dashboard shows the same scoped budgets as the proxy.
+  // Combine personal and non-default group model access without returning
+  // quota configuration to the user dashboard.
   type ModelRow = {
     modelId: string;
     alias: string;
     isActive: boolean | null;
-    defaultMaxTokensPerDay: number | null;
-    defaultMaxRequestsPerDay: number | null;
-    defaultMaxRequestsPerMin: number | null;
-    defaultAllowedTimeStart: string | null;
-    defaultAllowedTimeEnd: string | null;
-    viaGroup: boolean;
-    viaUser: boolean;
   };
-
   const modelColumns = {
     modelId: models.id,
     alias: models.alias,
     isActive: models.isActive,
-    defaultMaxTokensPerDay: models.defaultMaxTokensPerDay,
-    defaultMaxRequestsPerDay: models.defaultMaxRequestsPerDay,
-    defaultMaxRequestsPerMin: models.defaultMaxRequestsPerMin,
-    defaultAllowedTimeStart: models.defaultAllowedTimeStart,
-    defaultAllowedTimeEnd: models.defaultAllowedTimeEnd,
   };
-
-  type ModelColumnRow = Omit<ModelRow, "viaGroup" | "viaUser">;
 
   const [groupModelRows, userModelRows] = await Promise.all([
     !isDefaultGroup && group
@@ -120,7 +100,7 @@ export async function GET(req: NextRequest) {
           .from(groupModels)
           .innerJoin(models, eq(groupModels.modelId, models.id))
           .where(eq(groupModels.groupId, group.id))
-      : Promise.resolve<ModelColumnRow[]>([]),
+      : Promise.resolve<ModelRow[]>([]),
     db
       .select(modelColumns)
       .from(userModels)
@@ -129,73 +109,11 @@ export async function GET(req: NextRequest) {
   ]);
 
   const modelMap = new Map<string, ModelRow>();
-  for (const m of groupModelRows) {
-    modelMap.set(m.modelId, { ...m, viaGroup: true, viaUser: false });
-  }
-  for (const m of userModelRows) {
-    const existing = modelMap.get(m.modelId);
-    modelMap.set(m.modelId, existing
-      ? { ...existing, viaUser: true }
-      : { ...m, viaGroup: false, viaUser: true });
+  for (const model of [...groupModelRows, ...userModelRows]) {
+    modelMap.set(model.modelId, model);
   }
   const authorizedModels = Array.from(modelMap.values());
-
   const modelIds = authorizedModels.map((m) => m.modelId);
-
-  // Fetch personal and shared group budgets independently.
-  type QuotaRow = {
-    modelId: string | null;
-    maxTokensPerDay: number | null;
-    maxRequestsPerDay: number | null;
-    maxRequestsPerMin: number | null;
-    allowedTimeStart: string | null;
-    allowedTimeEnd: string | null;
-  };
-
-  let groupQuotaMap = new Map<string | null, QuotaRow>();
-  let userQuotaMap = new Map<string | null, QuotaRow>();
-
-  if (modelIds.length > 0) {
-    const [groupQuotas, userQuotas] = await Promise.all([
-      !isDefaultGroup && group
-        ? db
-            .select({
-              modelId: groupModelQuotas.modelId,
-              maxTokensPerDay: groupModelQuotas.maxTokensPerDay,
-              maxRequestsPerDay: groupModelQuotas.maxRequestsPerDay,
-              maxRequestsPerMin: groupModelQuotas.maxRequestsPerMin,
-              allowedTimeStart: groupModelQuotas.allowedTimeStart,
-              allowedTimeEnd: groupModelQuotas.allowedTimeEnd,
-            })
-            .from(groupModelQuotas)
-            .where(
-              and(
-                eq(groupModelQuotas.groupId, group.id),
-                inArray(groupModelQuotas.modelId, modelIds)
-              )
-            )
-        : Promise.resolve<QuotaRow[]>([]),
-      db
-        .select({
-          modelId: userModelQuotas.modelId,
-          maxTokensPerDay: userModelQuotas.maxTokensPerDay,
-          maxRequestsPerDay: userModelQuotas.maxRequestsPerDay,
-          maxRequestsPerMin: userModelQuotas.maxRequestsPerMin,
-          allowedTimeStart: userModelQuotas.allowedTimeStart,
-          allowedTimeEnd: userModelQuotas.allowedTimeEnd,
-        })
-        .from(userModelQuotas)
-        .where(
-          and(
-            eq(userModelQuotas.userId, userId),
-            inArray(userModelQuotas.modelId, modelIds)
-          )
-        ),
-    ]);
-
-    groupQuotaMap = new Map(groupQuotas.map((q) => [q.modelId, q]));
-    userQuotaMap = new Map(userQuotas.map((q) => [q.modelId, q]));
-  }
 
   // Fetch today's per-model usage
   const todayModelUsage =
@@ -217,13 +135,6 @@ export async function GET(req: NextRequest) {
       : [];
 
   const usageMap = new Map(todayModelUsage.map((u) => [u.modelId, u]));
-
-  const sharedModelUsage = !isDefaultGroup && group
-    ? await getGroupDailyUsage(
-        group.id, today, authorizedModels.filter((m) => m.viaGroup).map((m) => m.modelId),
-      )
-    : [];
-  const sharedUsageMap = new Map(sharedModelUsage.map((u) => [u.modelId, u]));
 
   // Per-model token usage over last 7 days for pie chart
   const modelStats =
@@ -254,46 +165,15 @@ export async function GET(req: NextRequest) {
     }))
     .filter((s) => s.totalTokens > 0 || s.requestCount > 0);
 
-  const modelsWithQuotas = authorizedModels.map((m) => {
-    const effective = resolveEffectiveQuota(
-      {
-        viaUser: m.viaUser,
-        groupId: m.viaGroup && group ? group.id : undefined,
-      },
-      {
-        maxTokensPerDay: m.defaultMaxTokensPerDay,
-        maxRequestsPerDay: m.defaultMaxRequestsPerDay,
-        maxRequestsPerMin: m.defaultMaxRequestsPerMin,
-        allowedTimeStart: m.defaultAllowedTimeStart,
-        allowedTimeEnd: m.defaultAllowedTimeEnd,
-      },
-      userQuotaMap.get(m.modelId),
-      groupQuotaMap.get(m.modelId),
-    );
+  const modelsWithUsage = authorizedModels.map((m) => {
     const usage = usageMap.get(m.modelId);
-    const singleWindow = effective.allowedTimeWindows.length === 1
-      ? effective.allowedTimeWindows[0]
-      : null;
     return {
       alias: m.alias,
       isActive: m.isActive,
-      quota: {
-        maxTokensPerDay: effective.maxTokensPerDay,
-        maxRequestsPerDay: effective.maxRequestsPerDay,
-        maxRequestsPerMin: effective.maxRequestsPerMin,
-        allowedTimeStart: singleWindow?.start ?? null,
-        allowedTimeEnd: singleWindow?.end ?? null,
-        allowedTimeWindows: effective.allowedTimeWindows,
-      },
       todayUsage: {
         totalTokens: Number(usage?.totalTokens ?? 0),
         requestCount: Number(usage?.requestCount ?? 0),
       },
-      groupQuota: effective.groupQuota,
-      groupTodayUsage: effective.groupQuota ? {
-        totalTokens: sharedUsageMap.get(m.modelId)?.totalTokens ?? 0,
-        requestCount: sharedUsageMap.get(m.modelId)?.requestCount ?? 0,
-      } : null,
     };
   });
 
@@ -319,7 +199,7 @@ export async function GET(req: NextRequest) {
       requestCount: todayStats[0].requestCount,
     },
     dailyTrend,
-    models: modelsWithQuotas,
+    models: modelsWithUsage,
     modelStats: modelStatsMapped,
     baseUrl,
     anthropicBaseUrl,
