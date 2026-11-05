@@ -87,10 +87,9 @@ describe("GET /api/auth/dashboard", () => {
     expect(aliases).toContain("model-a");
     expect(aliases).toContain("model-b");
     expect(body.models).toHaveLength(2);
-    expect(body.models.find((m: { alias: string }) => m.alias === "model-b").groupQuota).toBeNull();
   });
 
-  it("shows separate personal and shared group quotas and usage", async () => {
+  it("returns model status and personal usage without exposing quotas or shared usage", async () => {
     setupDb((table, joined) => {
       if (table === users)
         return [{ id: "user-1", name: "U", email: "u@e", apiKey: "k", isAdmin: false, groupId: "group-1" }];
@@ -98,40 +97,22 @@ describe("GET /api/auth/dashboard", () => {
         return [{ id: "group-1", name: "G", isDefault: false }];
       if (table === groupModels || table === userModels)
         return [modelColumns("model-a")];
-      if (table === groupModelQuotas)
-        return [{
-          modelId: "model-a",
-          maxTokensPerDay: null,
-          maxRequestsPerDay: null,
-          maxRequestsPerMin: 100,
-          allowedTimeStart: "10:00:00",
-          allowedTimeEnd: "16:00:00",
-        }];
-      if (table === userModelQuotas)
-        return [{
-          modelId: "model-a",
-          maxTokensPerDay: null,
-          maxRequestsPerDay: null,
-          maxRequestsPerMin: 5,
-          allowedTimeStart: "09:00:00",
-          allowedTimeEnd: "18:00:00",
-        }];
-      if (table === dailyUsage)
-        return [{ totalTokens: joined ? 1500 : 100, requestCount: joined ? 15 : 1, modelId: "model-a" }];
+      if (table === groupModelQuotas || table === userModelQuotas)
+        throw new Error("The user dashboard must not query quotas");
+      if (table === dailyUsage) {
+        if (joined) throw new Error("The user dashboard must not query group usage");
+        return [{ totalTokens: 100, requestCount: 1, modelId: "model-a" }];
+      }
       return [];
     });
 
     const res = await GET(req);
     const body = await res.json();
 
-    expect(body.models).toHaveLength(1);
-    expect(body.models[0].quota.maxRequestsPerMin).toBe(5);
-    expect(body.models[0].groupQuota.maxRequestsPerMin).toBe(100);
-    expect(body.models[0].todayUsage).toEqual({ totalTokens: 100, requestCount: 1 });
-    expect(body.models[0].groupTodayUsage).toEqual({ totalTokens: 1500, requestCount: 15 });
-    expect(body.models[0].quota.allowedTimeWindows).toEqual([
-      { start: "09:00:00", end: "18:00:00", source: "user" },
-      { start: "10:00:00", end: "16:00:00", source: "group" },
-    ]);
+    expect(body.models).toEqual([{
+      alias: "model-a",
+      isActive: true,
+      todayUsage: { totalTokens: 100, requestCount: 1 },
+    }]);
   });
 });
