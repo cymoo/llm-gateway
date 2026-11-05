@@ -64,6 +64,11 @@ interface AuthorizedModel {
   } | null;
   overlapsGroup: boolean;
   effectiveQuota: {
+    groupQuota: {
+      maxTokensPerDay: number | null;
+      maxRequestsPerDay: number | null;
+      maxRequestsPerMin: number | null;
+    } | null;
     maxTokensPerDay: number | null;
     maxRequestsPerDay: number | null;
     maxRequestsPerMin: number | null;
@@ -780,8 +785,9 @@ function UserDetailContent() {
                             {am.quota?.maxTokensPerDay?.toLocaleString() || "—"}
                             {am.overlapsGroup && (
                               <div className="text-xs text-blue-600 dark:text-blue-400">
-                                {t("users.effectiveValue", {
-                                  value: am.effectiveQuota.maxTokensPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                {t("users.scopedValue", {
+                                  personal: am.effectiveQuota.maxTokensPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                  group: am.effectiveQuota.groupQuota?.maxTokensPerDay?.toLocaleString() ?? t("common.unlimited"),
                                 })}
                               </div>
                             )}
@@ -790,8 +796,9 @@ function UserDetailContent() {
                             {am.quota?.maxRequestsPerDay || "—"}
                             {am.overlapsGroup && (
                               <div className="text-xs text-blue-600 dark:text-blue-400">
-                                {t("users.effectiveValue", {
-                                  value: am.effectiveQuota.maxRequestsPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                {t("users.scopedValue", {
+                                  personal: am.effectiveQuota.maxRequestsPerDay?.toLocaleString() ?? t("common.unlimited"),
+                                  group: am.effectiveQuota.groupQuota?.maxRequestsPerDay?.toLocaleString() ?? t("common.unlimited"),
                                 })}
                               </div>
                             )}
@@ -800,8 +807,9 @@ function UserDetailContent() {
                             {am.quota?.maxRequestsPerMin || "—"}
                             {am.overlapsGroup && (
                               <div className="text-xs text-blue-600 dark:text-blue-400">
-                                {t("users.effectiveValue", {
-                                  value: am.effectiveQuota.maxRequestsPerMin?.toLocaleString() ?? t("common.unlimited"),
+                                {t("users.scopedValue", {
+                                  personal: am.effectiveQuota.maxRequestsPerMin?.toLocaleString() ?? t("common.unlimited"),
+                                  group: am.effectiveQuota.groupQuota?.maxRequestsPerMin?.toLocaleString() ?? t("common.unlimited"),
                                 })}
                               </div>
                             )}

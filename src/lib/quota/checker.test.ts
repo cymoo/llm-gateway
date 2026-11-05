@@ -5,7 +5,7 @@ const { mockSelect, mockRateLimiter } = vi.hoisted(() => {
   const limiterCheck = vi.fn().mockReturnValue(true);
   return {
     mockSelect: select,
-    mockRateLimiter: { check: limiterCheck },
+    mockRateLimiter: { check: limiterCheck, checkAll: vi.fn() },
   };
 });
 
@@ -38,19 +38,25 @@ const baseCtx: QuotaContext = {
 };
 
 function makeSelectChain(rows: unknown[]) {
-  return {
-    from: () => ({
-      where: () => ({
-        limit: () => Promise.resolve(rows),
-      }),
-    }),
+  const chain = {
+    from: () => chain,
+    innerJoin: () => chain,
+    groupBy: () => chain,
+    where: () => chain,
+    limit: () => Promise.resolve(rows),
+    then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve(rows).then(resolve),
   };
+  return chain;
 }
 
 describe("checkQuota", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockRateLimiter.check.mockReturnValue(true);
+    mockRateLimiter.checkAll.mockImplementation((limits) =>
+      limits.find((limit: { subjectId: string; modelId: string; maxPerMin: number }) =>
+        !mockRateLimiter.check(limit.subjectId, limit.modelId, limit.maxPerMin)) ?? null,
+    );
   });
 
   describe("user quota access", () => {
@@ -172,16 +178,87 @@ describe("checkQuota", () => {
       expect(mockRateLimiter.check).toHaveBeenCalledWith("user-1", "model-1", 5);
     });
 
-    it("enforces the lower group daily limit", async () => {
+    it("enforces the shared group daily limit independently of personal usage", async () => {
       mockSelect
         .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 3 }]))
         .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 20 }]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 1, totalTokens: 0 }]))
         .mockReturnValueOnce(makeSelectChain([{ requestCount: 3, totalTokens: 0 }]));
 
       const result = await checkQuota(overlapCtx);
 
       expect(result?.status).toBe(429);
       expect((await result!.json()).error.code).toBe("daily_request_limit");
+    });
+  });
+
+  describe("shared group budgets", () => {
+    const ctx = { ...baseCtx, access: { viaUser: true, groupId: "group-1" } };
+
+    it("rejects a second member after the shared request budget is exhausted", async () => {
+      for (const userId of ["user-1", "user-2"]) {
+        mockSelect
+          .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 10 }]))
+          .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 3 }]))
+          .mockReturnValueOnce(makeSelectChain([{ requestCount: 1, totalTokens: 0 }]))
+          .mockReturnValueOnce(makeSelectChain([{ requestCount: 10, totalTokens: 0 }]));
+        const result = await checkQuota({ ...ctx, userId });
+        expect(result?.status).toBe(429);
+        expect((await result!.json()).error.message).toContain("Group");
+      }
+    });
+
+    it("allows combined group usage above the personal limit when each member is below it", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 100 }]))
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 3 }]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 2, totalTokens: 0 }]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 50, totalTokens: 0 }]));
+      expect(await checkQuota(ctx)).toBeNull();
+    });
+
+    it("rejects exhausted personal usage while the group still has capacity", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 100 }]))
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerDay: 3 }]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 3, totalTokens: 0 }]));
+      const result = await checkQuota(ctx);
+      expect(result?.status).toBe(429);
+      expect((await result!.json()).error.message).not.toContain("Group");
+    });
+
+    it("enforces shared tokens even when the member has barely used the model", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxTokensPerDay: 1000 }]))
+        .mockReturnValueOnce(makeSelectChain([]))
+        .mockReturnValueOnce(makeSelectChain([{ requestCount: 4, totalTokens: 1000 }]));
+      const result = await checkQuota(ctx);
+      expect(result?.status).toBe(429);
+      expect((await result!.json()).error.code).toBe("daily_token_limit");
+    });
+
+    it("rejects when only the shared per-minute budget is exhausted", async () => {
+      mockSelect
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 10 }]))
+        .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 3 }]));
+      mockRateLimiter.check.mockImplementation((subjectId: string) => !subjectId.startsWith("group:"));
+      const result = await checkQuota(ctx);
+      expect(result?.status).toBe(429);
+      const body = await result!.json();
+      expect(body.error.code).toBe("rate_limit_exceeded");
+      expect(body.error.message).toContain("Group");
+    });
+
+    it("checks a shared per-minute key for different group members", async () => {
+      for (const userId of ["user-1", "user-2"]) {
+        mockSelect
+          .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 10 }]))
+          .mockReturnValueOnce(makeSelectChain([{ maxRequestsPerMin: 3 }]));
+        expect(await checkQuota({ ...ctx, userId })).toBeNull();
+      }
+      expect(mockRateLimiter.check).toHaveBeenCalledWith("group:group-1", "model-1", 10);
+      expect(mockRateLimiter.check).toHaveBeenCalledWith("user-1", "model-1", 3);
+      expect(mockRateLimiter.check).toHaveBeenCalledWith("user-2", "model-1", 3);
     });
   });
 
@@ -268,7 +345,7 @@ const emptyQuota: QuotaValues = {
 };
 
 describe("resolveEffectiveQuota", () => {
-  it("takes the strictest configured numeric value on overlap", () => {
+  it("keeps personal and shared group limits separate on overlap", () => {
     const effective = resolveEffectiveQuota(
       { viaUser: true, groupId: "group-1" },
       { ...emptyQuota, maxRequestsPerMin: 20 },
@@ -277,7 +354,9 @@ describe("resolveEffectiveQuota", () => {
     );
 
     expect(effective.maxRequestsPerMin).toBe(5);
-    expect(effective.maxTokensPerDay).toBe(500);
+    expect(effective.maxTokensPerDay).toBe(1_000);
+    expect(effective.groupQuota?.maxTokensPerDay).toBe(500);
+    expect(effective.groupQuota?.maxRequestsPerMin).toBe(100);
   });
 
   it("uses a configured source before the model default", () => {
@@ -300,6 +379,39 @@ describe("resolveEffectiveQuota", () => {
     );
 
     expect(effective.maxRequestsPerDay).toBe(10);
+  });
+
+  it("does not turn the shared group budget into a personal cap or apply the model fallback", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: false, groupId: "group-1" },
+      { ...emptyQuota, maxRequestsPerDay: 1 },
+      { ...emptyQuota, maxRequestsPerDay: 2 }, // no personal model grant
+      { ...emptyQuota, maxRequestsPerDay: 10 },
+    );
+    expect(effective.maxRequestsPerDay).toBeNull();
+    expect(effective.groupQuota?.maxRequestsPerDay).toBe(10);
+  });
+
+  it("ignores stale group quota data without a group model grant", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true },
+      { ...emptyQuota, maxRequestsPerDay: 5 },
+      emptyQuota,
+      { ...emptyQuota, maxRequestsPerDay: 0 },
+    );
+    expect(effective.maxRequestsPerDay).toBe(5);
+    expect(effective.groupQuota).toBeNull();
+  });
+
+  it("preserves zero limits in each scope", () => {
+    const effective = resolveEffectiveQuota(
+      { viaUser: true, groupId: "group-1" },
+      emptyQuota,
+      { ...emptyQuota, maxRequestsPerDay: 0 },
+      { ...emptyQuota, maxTokensPerDay: 0 },
+    );
+    expect(effective.maxRequestsPerDay).toBe(0);
+    expect(effective.groupQuota?.maxTokensPerDay).toBe(0);
   });
 
   it("keeps both time windows so callers enforce their intersection", () => {

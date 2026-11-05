@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { usageLogs, dailyUsage } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
+import { getTodayStr } from "./date";
 
 export interface UsageRecord {
   userId: string;
@@ -16,14 +17,6 @@ export interface UsageRecord {
   backendUrl?: string | null;
   promptPreview?: string | null;
   clientIp?: string | null;
-}
-
-function getTodayStr(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = (now.getMonth() + 1).toString().padStart(2, "0");
-  const d = now.getDate().toString().padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 export function recordUsage(record: UsageRecord): void {

@@ -40,7 +40,7 @@ All traffic flows through `src/lib/proxy/handler.ts` → `handleProxy()`:
 2. **Parse** — decode JSON body, extract `model` alias and last user message for prompt preview
 3. **Resolve model** — look up model by `alias` in DB (alias is client-visible; `backendModel` is the upstream name)
 4. **Authorize** — check `user_models` join table to confirm user has access
-5. **Quota check** (`src/lib/quota/checker.ts`) — time window → per-minute rate limit (in-memory) → daily token/request limits (DB)
+5. **Quota check** (`src/lib/quota/checker.ts`) — time window → personal/shared daily token/request limits (DB) → atomic personal/shared per-minute rate limits (in-memory)
 6. **Forward** — rewrite `model` field to `backendModel`, send to `backendUrl`, handle streaming via `TransformStream`
 7. **Record usage** — non-blocking via `setImmediate` in `src/lib/usage/recorder.ts`
 
@@ -78,7 +78,9 @@ The initial admin user is seeded lazily on the first request to `POST /api/admin
 All proxy errors use `makeProxyError(message, type, code, status)` from `src/lib/proxy/errors.ts`, which always returns `{ error: { message, type, code } }` JSON. Admin API routes use the helpers in `src/app/api/admin/middleware.ts` (`unauthorizedResponse()`, `forbiddenResponse()`, `notFoundResponse()`, `badRequestResponse()`).
 
 ### Quota override hierarchy
-`userModelQuotas` row overrides model defaults. Any quota field being `null` means no limit. The effective value is: `quota?.field ?? model.defaultField ?? null`.
+Personal and non-default group model access are combined. Explicit personal numeric quotas use the user's own usage; explicit group numeric quotas use the sum of all current group members' usage for that model. Both budgets must pass independently. A numeric field falls back to the per-user model default only when neither applicable source configures it; a null default means unlimited. Every configured time window must allow access. Default groups and personal-only model grants do not use shared group budgets.
+
+Group daily totals use `getGroupDailyUsage()` to join `daily_usage` with current `users.group_id`, including inactive members. All per-minute scopes are checked before any counter is incremented. Daily dates use `src/lib/usage/date.ts` (server timezone). RPM counters remain process-local, and daily usage is recorded asynchronously without reserving capacity for concurrent requests.
 
 ### Unit test mocking
 Tests use `vi.hoisted()` to create mock functions before module imports, then pass them into `vi.mock()` factory functions. This is required because `vi.mock()` is hoisted by Vitest but the mock implementations need to be defined before the module under test is imported.

@@ -94,12 +94,6 @@ export default function LoginPage() {
                 {t("auth.submitSelfReg")}
               </Link>
             </div>
-            <div className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
-              {t("auth.isAdmin")}{" "}
-              <Link href="/admin/login" className="underline">
-                {t("auth.goAdminLogin")}
-              </Link>
-            </div>
           </CardContent>
         </Card>
       </div>

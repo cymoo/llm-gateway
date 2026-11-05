@@ -27,18 +27,19 @@ import {
 // Chainable drizzle mock that routes results by the table passed to `.from()`,
 // so the test is independent of query order. Every dailyUsage query resolves to
 // a single zero row (valid for both the `[0]` aggregate reads and the maps).
-function setupDb(resolver: (table: unknown) => unknown[]) {
+function setupDb(resolver: (table: unknown, joined: boolean) => unknown[]) {
   mockSelect.mockImplementation(() => {
     let table: unknown;
+    let joined = false;
     const c: Record<string, unknown> = {
       from: (t: unknown) => ((table = t), c),
-      innerJoin: () => c,
+      innerJoin: () => ((joined = true), c),
       where: () => c,
       groupBy: () => c,
       orderBy: () => c,
-      limit: () => Promise.resolve(resolver(table)),
+      limit: () => Promise.resolve(resolver(table, joined)),
       then: (onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) =>
-        Promise.resolve(resolver(table)).then(onF, onR),
+        Promise.resolve(resolver(table, joined)).then(onF, onR),
     };
     return c;
   });
@@ -86,10 +87,11 @@ describe("GET /api/auth/dashboard", () => {
     expect(aliases).toContain("model-a");
     expect(aliases).toContain("model-b");
     expect(body.models).toHaveLength(2);
+    expect(body.models.find((m: { alias: string }) => m.alias === "model-b").groupQuota).toBeNull();
   });
 
-  it("shows the strictest effective quota for an overlapping model", async () => {
-    setupDb((table) => {
+  it("shows separate personal and shared group quotas and usage", async () => {
+    setupDb((table, joined) => {
       if (table === users)
         return [{ id: "user-1", name: "U", email: "u@e", apiKey: "k", isAdmin: false, groupId: "group-1" }];
       if (table === groups)
@@ -115,7 +117,7 @@ describe("GET /api/auth/dashboard", () => {
           allowedTimeEnd: "18:00:00",
         }];
       if (table === dailyUsage)
-        return [{ totalTokens: 0, requestCount: 0, date: "2026-06-30", modelId: null }];
+        return [{ totalTokens: joined ? 1500 : 100, requestCount: joined ? 15 : 1, modelId: "model-a" }];
       return [];
     });
 
@@ -124,6 +126,9 @@ describe("GET /api/auth/dashboard", () => {
 
     expect(body.models).toHaveLength(1);
     expect(body.models[0].quota.maxRequestsPerMin).toBe(5);
+    expect(body.models[0].groupQuota.maxRequestsPerMin).toBe(100);
+    expect(body.models[0].todayUsage).toEqual({ totalTokens: 100, requestCount: 1 });
+    expect(body.models[0].groupTodayUsage).toEqual({ totalTokens: 1500, requestCount: 15 });
     expect(body.models[0].quota.allowedTimeWindows).toEqual([
       { start: "09:00:00", end: "18:00:00", source: "user" },
       { start: "10:00:00", end: "16:00:00", source: "group" },

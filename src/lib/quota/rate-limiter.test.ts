@@ -62,6 +62,21 @@ describe("RateLimiter", () => {
     expect(limiter.check("u1", "m1", 2)).toBe(true); // T=60050, only T=100 in window
   });
 
+  it("shares a group budget across members without consuming rejected requests", () => {
+    const limiter = RateLimiterModule.getRateLimiter();
+    const group = { subjectId: "group:g1", modelId: "m1", maxPerMin: 2 };
+    const member = (id: string) => ({ subjectId: id, modelId: "m1", maxPerMin: 1 });
+    expect(limiter.checkAll([group, member("u1")])).toBeNull();
+    expect(limiter.checkAll([group, member("u1")])).toEqual(member("u1"));
+    expect(limiter.checkAll([group, member("u2")])).toBeNull();
+    expect(limiter.checkAll([group, member("u3")])).toEqual(group);
+    // Other groups and models remain independent.
+    expect(limiter.checkAll([{ ...group, subjectId: "group:g2" }, member("u3")])).toBeNull();
+    expect(limiter.checkAll([{ ...group, modelId: "m2" }])).toBeNull();
+    vi.advanceTimersByTime(60_000);
+    expect(limiter.checkAll([group, member("u1")])).toBeNull();
+  });
+
   it("cleanup removes stale entries", () => {
     const limiter = RateLimiterModule.getRateLimiter();
     limiter.check("u1", "m1", 10);

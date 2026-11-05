@@ -13,6 +13,8 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { getAuthUser, unauthorizedResponse } from "@/app/api/auth/middleware";
 import { resolveEffectiveQuota } from "@/lib/quota/checker";
+import { getGroupDailyUsage } from "@/lib/quota/group-usage";
+import { getTodayStr } from "@/lib/usage/date";
 
 export async function GET(req: NextRequest) {
   const authUser = await getAuthUser(req);
@@ -21,11 +23,11 @@ export async function GET(req: NextRequest) {
   const userId = authUser.userId;
 
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
+  const today = getTodayStr(now);
 
   const d7 = new Date(now);
   d7.setDate(d7.getDate() - 6);
-  const date7 = d7.toISOString().split("T")[0];
+  const date7 = getTodayStr(d7);
 
   const [userRows, todayStats, dailyTrend] = await Promise.all([
     db
@@ -84,7 +86,7 @@ export async function GET(req: NextRequest) {
 
   // Fetch accessible models: the union of the group's models (for a non-default
   // group) and the user's own authorized models. Retain both sources on
-  // overlap so the dashboard shows the same effective quota as the proxy.
+  // overlap so the dashboard shows the same scoped budgets as the proxy.
   type ModelRow = {
     modelId: string;
     alias: string;
@@ -140,7 +142,7 @@ export async function GET(req: NextRequest) {
 
   const modelIds = authorizedModels.map((m) => m.modelId);
 
-  // Fetch quota overrides from both sources for strictest-wins resolution.
+  // Fetch personal and shared group budgets independently.
   type QuotaRow = {
     modelId: string | null;
     maxTokensPerDay: number | null;
@@ -216,6 +218,13 @@ export async function GET(req: NextRequest) {
 
   const usageMap = new Map(todayModelUsage.map((u) => [u.modelId, u]));
 
+  const sharedModelUsage = !isDefaultGroup && group
+    ? await getGroupDailyUsage(
+        group.id, today, authorizedModels.filter((m) => m.viaGroup).map((m) => m.modelId),
+      )
+    : [];
+  const sharedUsageMap = new Map(sharedModelUsage.map((u) => [u.modelId, u]));
+
   // Per-model token usage over last 7 days for pie chart
   const modelStats =
     modelIds.length > 0
@@ -277,9 +286,14 @@ export async function GET(req: NextRequest) {
         allowedTimeWindows: effective.allowedTimeWindows,
       },
       todayUsage: {
-        totalTokens: usage?.totalTokens ?? 0,
-        requestCount: usage?.requestCount ?? 0,
+        totalTokens: Number(usage?.totalTokens ?? 0),
+        requestCount: Number(usage?.requestCount ?? 0),
       },
+      groupQuota: effective.groupQuota,
+      groupTodayUsage: effective.groupQuota ? {
+        totalTokens: sharedUsageMap.get(m.modelId)?.totalTokens ?? 0,
+        requestCount: sharedUsageMap.get(m.modelId)?.requestCount ?? 0,
+      } : null,
     };
   });
 

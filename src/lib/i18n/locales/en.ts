@@ -140,12 +140,13 @@ const en = {
     enterNewPwd: "Enter new password",
     selectGroup: "Select group…",
     groupManagedNote:
-      "User belongs to group {group}. Personal and group access both apply, with the stricter quota used on overlap.",
+      "User belongs to group {group}. Personal quotas apply per user; group quotas are shared by all members. Both apply on overlap.",
     modelInheritedNote:
       "Model access is inherited from group {group}. Shown below for reference only.",
     modelMergedNote:
-      "User belongs to group {group}. Personal and group model access are combined; overlapping quotas both apply, using the stricter limit.",
+      "User belongs to group {group}. Personal and group model access are combined. Personal quotas apply per user, and shared group quotas also apply.",
     effectiveValue: "Effective: {value}",
+    scopedValue: "Personal: {personal} / Shared group: {group}",
     editInGroup: "Edit in Group",
     noModelsAuthorized: "No models authorized yet",
     selectModel: "Select model…",
@@ -172,6 +173,7 @@ const en = {
   groups: {
     title: "Groups",
     subtitle: "Manage user groups and per-model quotas",
+    sharedQuotaNote: "These limits are shared by all current group members for each model. Personal quotas also apply independently.",
     newGroup: "New Group",
     createGroup: "Create Group",
     remarkOptional: "Remark (optional)",
@@ -352,6 +354,9 @@ const en = {
     viewDetails: "View details",
   },
   userDashboard: {
+    scope: "Quota scope",
+    personal: "Personal",
+    sharedGroup: "Shared group",
     welcomeBack: "Welcome back",
     logout: "Logout",
     usageStatistics: "Usage Statistics",

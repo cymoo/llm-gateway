@@ -57,7 +57,7 @@ describe("GET /api/admin/users/[id]/models", () => {
     expect(await res.json()).toEqual({ error: "User not found" });
   });
 
-  it("returns the strictest effective quota for an overlapping model", async () => {
+  it("returns personal and shared group quotas for an overlapping model", async () => {
     const personalRow = {
       model: {
         id: "model-1",
@@ -112,6 +112,7 @@ describe("GET /api/admin/users/[id]/models", () => {
 
     expect(body[0].overlapsGroup).toBe(true);
     expect(body[0].effectiveQuota.maxRequestsPerMin).toBe(5);
+    expect(body[0].effectiveQuota.groupQuota.maxRequestsPerMin).toBe(100);
   });
 });
 
