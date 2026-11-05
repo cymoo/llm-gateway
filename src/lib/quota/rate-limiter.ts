@@ -1,5 +1,11 @@
+export interface RateLimit {
+  subjectId: string;
+  modelId: string;
+  maxPerMin: number;
+}
+
 /**
- * In-memory sliding window rate limiter for per-user per-model per-minute limits.
+ * In-memory sliding window rate limiter for personal and shared group per-model per-minute limits.
  * Suitable for single-process deployments with <100 concurrency.
  */
 class RateLimiter {
@@ -14,18 +20,25 @@ class RateLimiter {
   }
 
   check(userId: string, modelId: string, maxPerMin: number): boolean {
-    const key = `${userId}:${modelId}`;
+    return this.checkAll([{ subjectId: userId, modelId, maxPerMin }]) === null;
+  }
+
+  /** Returns the rejected limit, or consumes one request in every scope. */
+  checkAll(limits: RateLimit[]): RateLimit | null {
     const now = Date.now();
     const windowStart = now - 60_000;
-    let timestamps = this.windows.get(key) || [];
-    timestamps = timestamps.filter((t) => t > windowStart);
-    if (timestamps.length >= maxPerMin) {
+    const windows = limits.map((limit) => {
+      const key = `${limit.subjectId}:${limit.modelId}`;
+      const timestamps = (this.windows.get(key) ?? []).filter((t) => t > windowStart);
       this.windows.set(key, timestamps);
-      return false;
-    }
-    timestamps.push(now);
-    this.windows.set(key, timestamps);
-    return true;
+      return { limit, timestamps };
+    });
+    const rejected = windows.find(({ limit, timestamps }) => timestamps.length >= limit.maxPerMin);
+    if (rejected) return rejected.limit;
+    // This method is synchronous, so the multi-scope check and update are atomic
+    // within the process just like a single-scope check.
+    for (const { timestamps } of windows) timestamps.push(now);
+    return null;
   }
 
   cleanup() {

@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { userModelQuotas, groupModelQuotas, dailyUsage } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { getRateLimiter } from "./rate-limiter";
+import { getRateLimiter, type RateLimit } from "./rate-limiter";
+import { getGroupDailyUsage } from "./group-usage";
+import { getTodayStr } from "@/lib/usage/date";
 import { makeProxyError } from "@/lib/proxy/errors";
 
 export interface QuotaAccess {
@@ -23,10 +25,14 @@ export interface AllowedTimeWindow {
   source: "user" | "group" | "model";
 }
 
-export interface EffectiveQuota {
+export interface NumericQuota {
   maxTokensPerDay: number | null;
   maxRequestsPerDay: number | null;
   maxRequestsPerMin: number | null;
+}
+
+export interface EffectiveQuota extends NumericQuota {
+  groupQuota: NumericQuota | null;
   allowedTimeWindows: AllowedTimeWindow[];
 }
 
@@ -47,23 +53,18 @@ type NumericQuotaKey =
   | "maxRequestsPerDay"
   | "maxRequestsPerMin";
 
-function mostRestrictiveNumber(
+function personalNumber(
   key: NumericQuotaKey,
   access: QuotaAccess,
   defaults: QuotaValues,
   userQuota?: QuotaValues,
   groupQuota?: QuotaValues,
 ): number | null {
-  const configured: number[] = [];
-
-  if (access.viaUser && userQuota?.[key] != null) {
-    configured.push(userQuota[key]);
-  }
-  if (access.groupId && groupQuota?.[key] != null) {
-    configured.push(groupQuota[key]);
-  }
-
-  return configured.length > 0 ? Math.min(...configured) : defaults[key];
+  if (access.viaUser && userQuota?.[key] != null) return userQuota[key];
+  // A configured shared budget replaces the model fallback for this field,
+  // but never replaces an explicitly configured personal budget.
+  if (access.groupId && groupQuota?.[key] != null) return null;
+  return defaults[key];
 }
 
 function configuredWindow(
@@ -83,9 +84,10 @@ function configuredWindow(
 }
 
 /**
- * Explicit user/group limits are combined field-by-field using the lower
- * value. Model defaults remain fallbacks. Every returned time window must be
- * satisfied, which gives us intersection semantics even across midnight.
+ * Numeric fields describe the personal budget; groupQuota describes the
+ * separate shared budget. Both must pass using their own usage counters.
+ * Model defaults apply only when neither source configures a field. Every
+ * returned time window must be satisfied, including across midnight.
  */
 export function resolveEffectiveQuota(
   access: QuotaAccess,
@@ -115,27 +117,34 @@ export function resolveEffectiveQuota(
   }
 
   return {
-    maxTokensPerDay: mostRestrictiveNumber(
+    maxTokensPerDay: personalNumber(
       "maxTokensPerDay",
       access,
       defaults,
       userQuota,
       groupQuota,
     ),
-    maxRequestsPerDay: mostRestrictiveNumber(
+    maxRequestsPerDay: personalNumber(
       "maxRequestsPerDay",
       access,
       defaults,
       userQuota,
       groupQuota,
     ),
-    maxRequestsPerMin: mostRestrictiveNumber(
+    maxRequestsPerMin: personalNumber(
       "maxRequestsPerMin",
       access,
       defaults,
       userQuota,
       groupQuota,
     ),
+    groupQuota: access.groupId
+      ? {
+          maxTokensPerDay: groupQuota?.maxTokensPerDay ?? null,
+          maxRequestsPerDay: groupQuota?.maxRequestsPerDay ?? null,
+          maxRequestsPerMin: groupQuota?.maxRequestsPerMin ?? null,
+        }
+      : null,
     allowedTimeWindows,
   };
 }
@@ -146,14 +155,6 @@ function getCurrentTimeStr(): string {
   const m = now.getMinutes().toString().padStart(2, "0");
   const s = now.getSeconds().toString().padStart(2, "0");
   return `${h}:${m}:${s}`;
-}
-
-function getTodayStr(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = (now.getMonth() + 1).toString().padStart(2, "0");
-  const d = now.getDate().toString().padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 function timeToSeconds(t: string): number {
@@ -238,23 +239,11 @@ export async function checkQuota(
     );
   }
 
-  if (effective.maxRequestsPerMin !== null) {
-    const limiter = getRateLimiter();
-    if (!limiter.check(userId, modelId, effective.maxRequestsPerMin)) {
-      return makeProxyError(
-        `Rate limit exceeded: max ${effective.maxRequestsPerMin} requests per minute`,
-        "rate_limit_error",
-        "rate_limit_exceeded",
-        429
-      );
-    }
-  }
-
+  const today = getTodayStr();
   if (
     effective.maxRequestsPerDay !== null ||
     effective.maxTokensPerDay !== null
   ) {
-    const today = getTodayStr();
     const usageRows = await db
       .select()
       .from(dailyUsage)
@@ -292,6 +281,55 @@ export async function checkQuota(
         "rate_limit_error",
         "daily_token_limit",
         429
+      );
+    }
+  }
+
+  const shared = effective.groupQuota;
+  if (
+    ctx.access.groupId && shared &&
+    (shared.maxRequestsPerDay !== null || shared.maxTokensPerDay !== null)
+  ) {
+    const [usage] = await getGroupDailyUsage(ctx.access.groupId, today, [modelId]);
+    if (
+      shared.maxRequestsPerDay !== null &&
+      (usage?.requestCount ?? 0) >= shared.maxRequestsPerDay
+    ) {
+      return makeProxyError(
+        `Group daily request limit exceeded: max ${shared.maxRequestsPerDay} requests per day shared by all members`,
+        "rate_limit_error", "daily_request_limit", 429,
+      );
+    }
+    if (
+      shared.maxTokensPerDay !== null &&
+      (usage?.totalTokens ?? 0) >= shared.maxTokensPerDay
+    ) {
+      return makeProxyError(
+        `Group daily token limit exceeded: max ${shared.maxTokensPerDay} tokens per day shared by all members`,
+        "rate_limit_error", "daily_token_limit", 429,
+      );
+    }
+  }
+
+  const limits: RateLimit[] = [];
+  if (effective.maxRequestsPerMin !== null) {
+    limits.push({
+      subjectId: userId, modelId, maxPerMin: effective.maxRequestsPerMin,
+    });
+  }
+  if (ctx.access.groupId && shared?.maxRequestsPerMin != null) {
+    limits.push({
+      subjectId: `group:${ctx.access.groupId}`, modelId, maxPerMin: shared.maxRequestsPerMin,
+    });
+  }
+  // Check all scopes before consuming any RPM budget, so a rejection in one
+  // scope cannot exhaust another member's shared budget.
+  if (limits.length > 0) {
+    const rejected = getRateLimiter().checkAll(limits);
+    if (rejected) {
+      return makeProxyError(
+        `${rejected.subjectId.startsWith("group:") ? "Group rate" : "Rate"} limit exceeded: max ${rejected.maxPerMin} requests per minute`,
+        "rate_limit_error", "rate_limit_exceeded", 429,
       );
     }
   }

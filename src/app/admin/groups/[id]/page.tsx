@@ -451,6 +451,11 @@ export default function GroupDetailPage() {
             </span>
           </div>
         )}
+        {!group.isDefault && (
+          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+            {t("groups.sharedQuotaNote")}
+          </p>
+        )}
         {groupModels.length === 0 ? (
           <p className="text-sm text-slate-400 dark:text-slate-500">{t("groups.noMembers")}</p>
         ) : (

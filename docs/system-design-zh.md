@@ -247,14 +247,22 @@ CREATE INDEX idx_daily_usage_user_model_date ON daily_usage(user_id, model_id, d
 
 非默认分组用户：
     ├── 仅个人授权 → 使用个人配额
-    ├── 仅分组授权 → 使用分组配额
+    ├── 仅分组授权 → 使用全组共享配额
     └── 个人与分组重复授权
-          ├── 数值配额逐字段取已配置值中的较小值
+          ├── 个人配额按当前用户用量检查，分组配额按全组汇总用量检查
           └── 时间窗口必须同时满足（取交集）
 
 所有适用来源都未配置某字段 → 回退 models.default_*
 models.default_* 也为 NULL → 不限制
+分组显式数值配额覆盖对应模型默认值；个人显式配额始终独立生效。
+仅个人授权的模型不受分组配额影响，默认分组不使用共享配额。
 ```
+
+分组每日用量通过 `daily_usage JOIN users` 汇总当前组内所有成员（含停用成员）当天对该模型的请求数与 Token 数。成员转组时，当天已有用量随当前归属重新汇总；删除成员后其匿名用量不再计入该组。不新增计数表，无需数据库迁移。
+
+每分钟配额按 `userId:modelId` 与 `group:groupId:modelId` 分别维护。所有适用的分钟配额均通过后才同时增加计数，避免个人限流的失败请求挤占共享配额。当前限流器仍适用于单进程部署；每日检查继续基于异步记录的已完成请求用量，并非对并发或进行中请求预留额度。
+
+用户控制台按「个人」与「全组共享」分别展示用量和上限，日期与限额检查及用量记录统一使用网关服务器时区。
 
 ### 3.4 初始管理员 Seed
 
@@ -432,19 +440,16 @@ Body:  { "model": "qwen3", ... }   ← alias 替换为 backend_model
 │        当前时间不在 [allowed_time_start, allowed_time_end] 内
 │        → 403 time_restricted
 │
-│     b. 每分钟请求限流（内存滑动窗口）
-│        检查最近 60s 内该 user+model 的请求数
-│        超过 max_requests_per_min → 429 rate_limit_exceeded
+│     b. 每日请求次数与 Token 用量
+│        个人预算：daily_usage WHERE user_id=$1 AND model_id=$2 AND date=today
+│        分组预算：daily_usage JOIN users ON daily_usage.user_id=users.id
+│          WHERE users.group_id=$1 AND model_id=$2 AND date=today
+│          汇总 SUM(request_count) 与 SUM(total_tokens)
+│        任一预算耗尽 → 429 daily_request_limit / daily_token_limit
 │
-│     c. 每日请求次数
-│        SELECT request_count FROM daily_usage
-│          WHERE user_id=$1 AND model_id=$2 AND date=today
-│        超过 max_requests_per_day → 429 daily_request_limit
-│
-│     d. 每日 token 用量
-│        SELECT total_tokens FROM daily_usage
-│          WHERE user_id=$1 AND model_id=$2 AND date=today
-│        超过 max_tokens_per_day → 429 daily_token_limit
+│     c. 每分钟请求限流（内存滑动窗口）
+│        分别检查最近 60s 内该 user+model 和 group+model 的请求数
+│        任一超限 → 429 rate_limit_exceeded；全部通过才同步增加计数
 │
 ├─ 6. 构造后端请求
 │     - URL: backend_url + /chat/completions 或 /completions

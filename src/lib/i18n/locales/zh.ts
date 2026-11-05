@@ -138,11 +138,12 @@ const zh: Translations = {
     enterNewPwd: "输入新密码",
     selectGroup: "选择分组…",
     groupManagedNote:
-      "该用户属于分组 {group}；个人与分组模型权限同时有效，重叠配额采用更严格限制。",
+      "用户属于分组 {group}。个人限额按用户计算，分组限额由全组成员共享；重复授权时两者都必须满足。",
     modelInheritedNote:
       "模型访问权限继承自分组 {group}，以下仅供参考。",
     modelMergedNote:
-      "该用户属于分组 {group}。个人与分组模型权限合并；重叠模型的配额同时生效，并采用更严格的限制。",
+      "用户属于分组 {group}。个人限额按用户计算，分组限额由全组成员共享；重复授权时两者都必须满足。",
+    scopedValue: "个人：{personal} / 全组共享：{group}",
     effectiveValue: "生效：{value}",
     editInGroup: "在分组中编辑",
     noModelsAuthorized: "暂无已授权模型",
@@ -169,6 +170,7 @@ const zh: Translations = {
   groups: {
     title: "分组管理",
     subtitle: "管理用户分组和模型配额",
+    sharedQuotaNote: "以下限额按模型由当前组内所有成员共享，个人限额仍会独立生效。",
     newGroup: "新建分组",
     createGroup: "创建分组",
     remarkOptional: "备注（可选）",
@@ -344,6 +346,9 @@ const zh: Translations = {
     viewDetails: "查看详情",
   },
   userDashboard: {
+    scope: "限额范围",
+    personal: "个人",
+    sharedGroup: "全组共享",
     welcomeBack: "欢迎回来",
     logout: "退出登录",
     usageStatistics: "使用统计",

@@ -58,6 +58,12 @@ interface ModelInfo {
       source: "user" | "group" | "model";
     }>;
   };
+  groupQuota: {
+    maxTokensPerDay: number | null;
+    maxRequestsPerDay: number | null;
+    maxRequestsPerMin: number | null;
+  } | null;
+  groupTodayUsage: { totalTokens: number; requestCount: number } | null;
   todayUsage: {
     totalTokens: number;
     requestCount: number;
@@ -583,6 +589,7 @@ with client.messages.stream(
                   <thead>
                     <tr className="bg-slate-50/80 dark:bg-slate-700/40 border-b border-slate-200/60 dark:border-slate-700/60">
                       <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.model")}</th>
+                      <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.scope")}</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.status")}</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.todayUsage")}</th>
                       <th className="text-left py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">{t("userDashboard.tokensDay")}</th>
@@ -592,13 +599,24 @@ with client.messages.stream(
                     </tr>
                   </thead>
                   <tbody>
-                    {data.models.map((model, i) => (
+                    {data.models.flatMap((model) => [
+                      { ...model, scope: "personal" as const },
+                      ...(model.groupQuota ? [{
+                        ...model,
+                        scope: "sharedGroup" as const,
+                        quota: { ...model.quota, ...model.groupQuota },
+                        todayUsage: model.groupTodayUsage ?? { totalTokens: 0, requestCount: 0 },
+                      }] : []),
+                    ]).map((model, i) => (
                       <tr
-                        key={model.alias}
+                        key={`${model.alias}:${model.scope}`}
                         className={`border-b border-slate-100 dark:border-slate-700/40 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-700/20 transition-colors ${i % 2 === 0 ? "" : "bg-slate-50/30 dark:bg-slate-700/10"}`}
                       >
                         <td className="py-3 px-4 font-mono text-xs font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50/40 dark:bg-indigo-950/20">
                           {model.alias}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
+                          {t(`userDashboard.${model.scope}`)}
                         </td>
                         <td className="py-3 px-4">
                           <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
@@ -615,10 +633,10 @@ with client.messages.stream(
                           <span className="font-medium text-slate-700 dark:text-slate-300">{formatNum(model.todayUsage.totalTokens)}</span> tok
                         </td>
                         <td className="py-3 px-4 font-medium">
-                          {model.quota.maxTokensPerDay ? formatNum(model.quota.maxTokensPerDay) : <span className="text-slate-400">∞</span>}
+                          {model.quota.maxTokensPerDay !== null ? formatNum(model.quota.maxTokensPerDay) : <span className="text-slate-400">∞</span>}
                         </td>
                         <td className="py-3 px-4 font-medium">
-                          {model.quota.maxRequestsPerDay ? formatNum(model.quota.maxRequestsPerDay) : <span className="text-slate-400">∞</span>}
+                          {model.quota.maxRequestsPerDay !== null ? formatNum(model.quota.maxRequestsPerDay) : <span className="text-slate-400">∞</span>}
                         </td>
                         <td className="py-3 px-4 font-medium">
                           {model.quota.maxRequestsPerMin ?? <span className="text-slate-400">∞</span>}
