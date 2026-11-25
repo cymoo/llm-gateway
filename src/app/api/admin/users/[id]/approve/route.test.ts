@@ -8,7 +8,9 @@ const {
 } = vi.hoisted(() => {
   const updateReturning = vi.fn();
   const updateWhere = vi.fn(() => ({ returning: updateReturning }));
-  const updateSet = vi.fn(() => ({ where: updateWhere }));
+  const updateSet = vi.fn<(values: { isActive: boolean }) => { where: typeof updateWhere }>(
+    () => ({ where: updateWhere }),
+  );
   const update = vi.fn(() => ({ set: updateSet }));
   return {
     mockGetAdminUser: vi.fn(),

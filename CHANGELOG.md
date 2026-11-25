@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Proxy multipart audio transcriptions through `POST /api/v1/audio/transcriptions`. Administrators can register audio models, test each backend with a WAV upload, and grant model access through the existing request quotas and permissions.
+
 ### Fixed
 
 - Removed the admin-login link from the user login page to avoid confusing ordinary users. Administrators can still sign in at `/admin/login`.

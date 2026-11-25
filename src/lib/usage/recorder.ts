@@ -2,11 +2,12 @@ import { db } from "@/lib/db";
 import { usageLogs, dailyUsage } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import { getTodayStr } from "./date";
+import type { RequestType } from "@/lib/proxy/handler";
 
 export interface UsageRecord {
   userId: string;
   modelId: string;
-  requestType: "chat.completions" | "completions" | "embeddings" | "rerank";
+  requestType: RequestType;
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;

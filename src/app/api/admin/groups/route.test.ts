@@ -4,6 +4,7 @@ const {
   mockGetAdminUser,
   mockSelect,
   mockInsert,
+  mockInsertReturning,
   mockDelete,
 } = vi.hoisted(() => {
   const select = vi.fn();
@@ -82,12 +83,9 @@ describe("POST /api/admin/groups", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAdminUser.mockResolvedValue({ userId: "admin-1" });
-    mockInsert.mockReturnValue({
-      values: () => ({
-        returning: () =>
-          Promise.resolve([{ id: "group-new", name: "Marketing", isDefault: false, remark: null, createdAt: new Date(), updatedAt: new Date() }]),
-      }),
-    });
+    mockInsertReturning.mockResolvedValue([
+      { id: "group-new", name: "Marketing", isDefault: false, remark: null, createdAt: new Date(), updatedAt: new Date() },
+    ]);
   });
 
   it("creates a new group and returns 201", async () => {
@@ -112,11 +110,7 @@ describe("POST /api/admin/groups", () => {
   });
 
   it("returns 409 on duplicate name", async () => {
-    mockInsert.mockReturnValue({
-      values: () => ({
-        returning: () => Promise.reject(new Error("duplicate key unique constraint")),
-      }),
-    });
+    mockInsertReturning.mockRejectedValueOnce(new Error("duplicate key unique constraint"));
     const req = { json: async () => ({ name: "Engineering" }) };
     const res = await POST(req as never);
     expect(res.status).toBe(409);

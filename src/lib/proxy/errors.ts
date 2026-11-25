@@ -1,5 +1,6 @@
 export type ProxyErrorType =
   | "authentication_error"
+  | "invalid_request_error"
   | "permission_error"
   | "not_found_error"
   | "rate_limit_error"
@@ -7,6 +8,10 @@ export type ProxyErrorType =
 
 export type ProxyErrorCode =
   | "invalid_api_key"
+  | "invalid_multipart"
+  | "invalid_file"
+  | "invalid_stream"
+  | "payload_too_large"
   | "user_disabled"
   | "model_not_allowed"
   | "model_not_found"

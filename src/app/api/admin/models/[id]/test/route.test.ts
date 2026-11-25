@@ -80,6 +80,32 @@ describe("POST /api/admin/models/[id]/test", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk-be");
   });
 
+  it("tests an audio model by uploading a PCM WAV to the transcription endpoint", async () => {
+    setupModel({ id: "id-a", type: "audio" }, [backendRow({ backendModel: "qwen-asr" })]);
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ text: "" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(req, params);
+
+    expect((await response.json()).results[0].status).toBe("ok");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("http://backend/v1/audio/transcriptions");
+    const upstream = new Request(url, init);
+    expect(upstream.headers.get("authorization")).toBe("Bearer sk-be");
+    const sent = await upstream.formData();
+    expect(sent.get("model")).toBe("qwen-asr");
+    const file = sent.get("file") as File;
+    expect(file.type).toBe("audio/wav");
+    const bytes = await file.arrayBuffer();
+    const header = new DataView(bytes);
+    expect(new TextDecoder().decode(bytes.slice(0, 4))).toBe("RIFF");
+    expect(new TextDecoder().decode(bytes.slice(8, 12))).toBe("WAVE");
+    expect(header.getUint32(4, true)).toBe(bytes.byteLength - 8);
+    expect(header.getUint32(24, true)).toBe(16000);
+    expect(header.getUint16(34, true)).toBe(16);
+    expect(header.getUint32(40, true)).toBe(bytes.byteLength - 44);
+  });
+
   it("tests every backend of a multi-backend model", async () => {
     setupModel({ id: "id-a", type: "chat" }, [
       backendRow({ id: "backend-1", backendUrl: "http://gpu-1/v1" }),

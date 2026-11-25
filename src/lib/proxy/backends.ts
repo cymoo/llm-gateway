@@ -47,7 +47,7 @@ function conversationHead(messages: unknown[]): unknown[] {
  * Cache-affinity key for OpenAI-style requests. Conversations share a stable
  * head (system prompt + first user message) across turns, so hashing it keeps
  * a conversation on one backend and lets vLLM's prefix cache hit. Returns
- * null for request types with no prefix-cache benefit (embeddings/rerank) or
+ * null for request types with no prefix-cache benefit (embeddings, rerank, audio) or
  * malformed bodies — callers fall back to round-robin.
  */
 export function affinityKey(

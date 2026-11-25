@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { useLanguage } from "@/lib/i18n";
+import { validateModelType, type ModelType } from "@/lib/utils/validators";
 
 interface ModelBackend {
   id: string;
@@ -46,6 +47,13 @@ interface ModelUser {
   name: string;
   email: string;
 }
+
+const MODEL_TYPE_LABELS = {
+  chat: "models.typeChat",
+  embedding: "models.typeEmbedding",
+  rerank: "models.typeRerank",
+  audio: "models.typeAudio",
+} as const satisfies Record<ModelType, string>;
 
 export default function ModelsPage() {
   const { toast } = useToast();
@@ -234,11 +242,9 @@ export default function ModelsPage() {
                         variant="outline"
                         className="font-sans text-xs font-normal"
                       >
-                        {model.type === "embedding"
-                          ? t("models.typeEmbedding")
-                          : model.type === "rerank"
-                          ? t("models.typeRerank")
-                          : t("models.typeChat")}
+                        {t(model.type && validateModelType(model.type)
+                          ? MODEL_TYPE_LABELS[model.type]
+                          : MODEL_TYPE_LABELS.chat)}
                       </Badge>
                     </div>
                   </TableCell>

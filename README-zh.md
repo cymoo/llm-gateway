@@ -2,7 +2,7 @@
 
 一个基于 **Next.js 16** + **Drizzle ORM** + **PostgreSQL** 的 LLM 网关项目，提供：
 
-- 统一的大模型代理入口（兼容 OpenAI 风格 `chat.completions`、`completions`、`embeddings`、`rerank`）
+- 统一的 OpenAI 风格代理入口，支持对话、补全、向量嵌入、重排序和音频转写
 - Anthropic 兼容的 Messages 与 Models API
 - 单个模型可挂多台上游后端，缓存亲和负载均衡 + 自动故障切换
 - 公开自助注册（`/register`）+ 管理员审批流程
@@ -116,7 +116,7 @@ npm run dev
 
 ## 后端用量可观测性
 
-管理后台的 `/admin/usage?tab=logs`「请求日志」会记录并展示每次成功请求最终使用的上游后端。观察缓存亲和流量时应比较不同的独立对话，而不是同一对话的多轮请求：同一对话按设计固定在同一后端。Embedding 与 rerank 请求使用轮询路由。
+管理后台的 `/admin/usage?tab=logs`「请求日志」会记录并展示每次成功请求最终使用的上游后端。观察缓存亲和流量时应比较不同的独立对话，而不是同一对话的多轮请求：同一对话按设计固定在同一后端。向量嵌入、重排序和音频转写使用轮询路由。
 
 Backend 筛选条件同时作用于分页日志表和 CSV 导出。每条日志保存后端 ID 与 URL 快照，因此后端配置修改后仍可追溯；0.5.0 之前产生的日志不会显示后端。
 
@@ -125,6 +125,46 @@ Backend 筛选条件同时作用于分页日志表和 CSV 导出。每条日志�
 ```bash
 npm run migrate
 ```
+
+## 音频转写
+
+下面的命令在 NVIDIA GPU 主机上从本地目录加载 Qwen3-ASR-1.7B。容器启动时安装音频解码依赖，这一步需要访问 Python 包源。 [vLLM Docker 文档](https://docs.vllm.ai/en/v0.27.1/deployment/docker/)
+
+```bash
+docker run -d \
+  --name qwen3-asr \
+  --gpus '"device=0"' \
+  --shm-size=4g \
+  -p 127.0.0.1:8000:8000 \
+  -e HF_HUB_OFFLINE=1 \
+  --mount type=bind,source=/srv/models/Qwen3-ASR-1.7B,target=/models/Qwen3-ASR-1.7B,readonly \
+  --entrypoint /bin/bash \
+  vllm/vllm-openai:v0.27.1 \
+  -c 'uv pip install --system "vllm[audio]==0.27.1" &&
+      exec vllm serve /models/Qwen3-ASR-1.7B \
+        --served-model-name Qwen/Qwen3-ASR-1.7B \
+        --host 0.0.0.0 --port 8000'
+```
+
+容器就绪后，上传一段包含人声的 WAV，确认上游返回转写文本。 [vLLM 转写 API](https://docs.vllm.ai/en/v0.27.1/serving/online_serving/speech_to_text/)
+
+```bash
+curl --fail-with-body http://127.0.0.1:8000/v1/audio/transcriptions \
+  -F 'model=Qwen/Qwen3-ASR-1.7B' \
+  -F 'file=@sample.wav'
+```
+
+在 Gateway 后台新建「音频转写」模型，别名填 `qwen3-asr`，后端模型填 `Qwen/Qwen3-ASR-1.7B`。Gateway 直接运行在同一宿主机时，后端地址填 `http://127.0.0.1:8000/v1`。若 Gateway 也运行在容器里，可将两个容器加入同一个 Docker 网络，并使用 `http://qwen3-asr:8000/v1`。上游开启认证时填写后端 API Key。点击「测试连接」后，将模型授权给调用者或所在分组。
+
+```bash
+curl --fail-with-body http://localhost:3000/api/v1/audio/transcriptions \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" \
+  -F 'model=qwen3-asr' \
+  -F 'file=@sample.wav' \
+  -F 'response_format=json'
+```
+
+OpenAI SDK 的 Base URL 填 `http://localhost:3000/api/v1`。Gateway 接收最大 25 MiB 的音频文件，整个表单上限为 26 MiB。转写使用非流式响应，输出格式由上游模型决定。转写计入请求配额。vLLM 仅返回音频时长用量时，Gateway 原样返回给客户端，Token 用量记为 0。
 
 ## Anthropic 兼容 API
 

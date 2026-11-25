@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockSelect, mockCheckQuota, mockRecordUsage } = vi.hoisted(() => {
   const select = vi.fn();
@@ -25,6 +25,7 @@ vi.mock("@/lib/usage/recorder", () => ({
 
 import { handleProxy } from "./handler";
 import { _resetRoundRobin } from "./backends";
+import { POST as transcribe } from "@/app/api/v1/audio/transcriptions/route";
 
 // Queue-based drizzle mock. Auth/model/authorization queries resolve at
 // `.limit()`; the model_backends query resolves at `.orderBy()`.
@@ -63,6 +64,168 @@ const defaultBackend = {
   isActive: true,
   createdAt: new Date("2026-01-01T00:00:00Z"),
 };
+
+describe("POST /api/v1/audio/transcriptions", () => {
+  const audioModel = { id: "model-1", alias: "qwen-asr", type: "audio" };
+  const audioBackend = {
+    ...defaultBackend,
+    backendUrl: "http://backend/v1/",
+    backendModel: "Qwen/Qwen3-ASR-1.7B",
+    backendApiKey: "upstream-key",
+  };
+  const url = "http://gateway/api/v1/audio/transcriptions";
+  const audio = new File([new Uint8Array([0, 128, 255])], "clip.wav", {
+    type: "audio/wav",
+  });
+  const fetchMock = vi.fn();
+
+  function request(body: FormData | string) {
+    return new Request(url, {
+      method: "POST",
+      headers: { authorization: "Bearer test-key" },
+      body,
+    }) as Parameters<typeof transcribe>[0];
+  }
+
+  function form() {
+    const body = new FormData();
+    body.set("model", "qwen-asr");
+    body.set("file", audio);
+    return body;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    _resetRoundRobin();
+    mockCheckQuota.mockResolvedValue(null);
+    setupDb(chatQueue(audioModel, [audioBackend]));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("replays the original file and form fields with each backend's model and key", async () => {
+    const backup = {
+      ...audioBackend,
+      id: "backend-2",
+      backendUrl: "http://backup/v1",
+      backendModel: "backup-asr",
+      backendApiKey: null,
+    };
+    setupDb(chatQueue(audioModel, [audioBackend, backup]));
+    const responseBody = { text: "你好", usage: { type: "duration", seconds: 1 } };
+    fetchMock
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(Response.json(responseBody));
+    const body = form();
+    body.set("prompt", "one-off term");
+    body.set("language", "zh");
+    body.append("timestamp_granularities[]", "word");
+    body.append("timestamp_granularities[]", "segment");
+
+    const response = await transcribe(request(body));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(responseBody);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [index, [target, init]] of fetchMock.mock.calls.entries()) {
+      expect(target).toBe(index === 0
+        ? "http://backend/v1/audio/transcriptions"
+        : "http://backup/v1/audio/transcriptions");
+      // Use Fetch's serializer/parser to verify the generated multipart boundary.
+      const upstream = new Request(target, init);
+      expect(upstream.headers.get("authorization")).toBe(index === 0 ? "Bearer upstream-key" : null);
+      const sent = await upstream.formData();
+      expect(sent.get("model")).toBe(index === 0 ? audioBackend.backendModel : "backup-asr");
+      expect(sent.get("language")).toBe("zh");
+      expect(sent.get("prompt")).toBe("one-off term");
+      expect(sent.getAll("timestamp_granularities[]")).toEqual(["word", "segment"]);
+      const file = sent.get("file") as File;
+      expect(file.name).toBe("clip.wav");
+      expect(file.type).toBe("audio/wav");
+      expect(new Uint8Array(await file.arrayBuffer())).toEqual(new Uint8Array([0, 128, 255]));
+    }
+    expect(mockRecordUsage).toHaveBeenCalledTimes(1);
+    expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({
+      requestType: "audio.transcriptions",
+      backendId: "backend-2",
+      totalTokens: 0,
+      promptPreview: null,
+    }));
+  });
+
+  it("preserves a plain-text response", async () => {
+    fetchMock.mockResolvedValue(new Response("hello", {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    }));
+    const body = form();
+    body.set("response_format", "text");
+
+    const response = await transcribe(request(body));
+
+    expect(response.headers.get("content-type")).toBe("text/plain; charset=utf-8");
+    expect(await response.text()).toBe("hello");
+  });
+
+  it("rejects invalid uploads before forwarding", async () => {
+    const empty = form();
+    empty.set("file", new File([], "empty.wav"));
+    const duplicate = form();
+    duplicate.append("file", audio);
+    const stream = form();
+    stream.set("stream", "true");
+    const missingModel = form();
+    missingModel.delete("model");
+
+    for (const body of ["{}", empty, duplicate, stream, missingModel]) {
+      setupDb(chatQueue(audioModel, [audioBackend]));
+      expect((await transcribe(request(body))).status).toBe(400);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an audio file just over 25 MiB", async () => {
+    const body = form();
+    body.set("file", new Blob([new Uint8Array(25 * 1024 * 1024 + 1)]), "large.wav");
+
+    expect((await transcribe(request(body))).status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("bounds the multipart body even without a Content-Length header", async () => {
+    const chunk = new Uint8Array(1024 * 1024);
+    const cancel = vi.fn();
+    const body = new ReadableStream({ pull: (controller) => controller.enqueue(chunk), cancel });
+    const req = new Request(url, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer test-key",
+        "content-type": "multipart/form-data; boundary=audio",
+      },
+      body,
+      duplex: "half",
+    } as RequestInit) as Parameters<typeof transcribe>[0];
+
+    expect((await transcribe(req)).status).toBe(413);
+    expect(cancel).toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("enforces model type, grants and quotas before forwarding", async () => {
+    setupDb(chatQueue({ ...audioModel, type: "chat" }, [audioBackend]));
+    expect((await transcribe(request(form()))).status).toBe(404);
+
+    const denied = chatQueue(audioModel, [audioBackend]);
+    denied[3] = [];
+    setupDb(denied);
+    expect((await transcribe(request(form()))).status).toBe(403);
+
+    setupDb(chatQueue(audioModel, [audioBackend]));
+    mockCheckQuota.mockResolvedValueOnce(Response.json({}, { status: 429 }));
+    expect((await transcribe(request(form()))).status).toBe(429);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
 
 describe("handleProxy prompt preview", () => {
   beforeEach(() => {

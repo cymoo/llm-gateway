@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { models, modelBackends, type ModelBackend } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
+import { AUDIO_TRANSCRIPTIONS_PATH, audioTestForm } from "@/lib/proxy/audio";
 import {
   getAdminUser,
   unauthorizedResponse,
@@ -33,7 +34,7 @@ async function testBackend(
   const base = backend.backendUrl.replace(/\/$/, "");
 
   let testUrl: string;
-  let testBody: Record<string, unknown>;
+  let testBody: FormData | Record<string, unknown>;
   if (modelType === "embedding") {
     testUrl = `${base}/embeddings`;
     testBody = { model: backend.backendModel, input: "ping" };
@@ -44,6 +45,9 @@ async function testBackend(
       query: "ping",
       documents: ["ping"],
     };
+  } else if (modelType === "audio") {
+    testUrl = `${base}/${AUDIO_TRANSCRIPTIONS_PATH}`;
+    testBody = audioTestForm(backend.backendModel);
   } else {
     testUrl = `${base}/chat/completions`;
     testBody = {
@@ -59,9 +63,11 @@ async function testBackend(
   const timeoutId = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
 
   try {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const headers: Record<string, string> = {};
+    const body = testBody instanceof FormData ? testBody : JSON.stringify(testBody);
+    if (typeof body === "string") {
+      headers["Content-Type"] = "application/json";
+    }
     if (backend.backendApiKey) {
       headers["Authorization"] = `Bearer ${backend.backendApiKey}`;
     }
@@ -69,7 +75,7 @@ async function testBackend(
     const res = await fetch(testUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify(testBody),
+      body,
       signal: controller.signal,
     });
     clearTimeout(timeoutId);

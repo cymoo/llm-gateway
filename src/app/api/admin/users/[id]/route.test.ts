@@ -17,7 +17,9 @@ const {
 
   const updateReturning = vi.fn();
   const updateWhere = vi.fn(() => ({ returning: updateReturning }));
-  const updateSet = vi.fn(() => ({ where: updateWhere }));
+  const updateSet = vi.fn<(values: Record<string, unknown>) => { where: typeof updateWhere }>(
+    () => ({ where: updateWhere }),
+  );
   const update = vi.fn(() => ({ set: updateSet }));
 
   const deleteReturning = vi.fn();
