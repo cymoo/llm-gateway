@@ -141,23 +141,25 @@ export function isFailoverEligibleStatus(status: number): boolean {
   return status >= 500 || status === 429;
 }
 
+type BufferedResponse = {
+  text: string;
+  status: number;
+  contentType: string | null;
+};
+
 export type ForwardOutcome =
-  | { kind: "ok"; response: Response; backend: ModelBackend }
-  | {
-      kind: "http_error";
-      text: string;
-      status: number;
-      contentType: string | null;
-    }
+  | { kind: "stream"; response: Response; backend: ModelBackend }
+  | ({ kind: "ok"; backend: ModelBackend } & BufferedResponse)
+  | ({ kind: "http_error" } & BufferedResponse)
   | { kind: "timeout" }
   | { kind: "network_error" };
 
 /**
- * Tries backends in order until one responds OK. Failover happens on connect
- * errors and failover-eligible HTTP statuses (5xx/429), and only before the
- * response body is consumed — so streamed responses can still fail over as
- * long as the stream hasn't started. Timeouts are returned immediately:
- * retrying after a full timeout would stall the client for n× the limit.
+ * Retries transport failures and failover-eligible HTTP statuses (5xx/429).
+ * For buffered responses the deadline covers the body, and a disconnect can
+ * still fail over because the caller has yet to receive a response. Successful
+ * streams are handed to the caller as soon as the headers arrive. A timeout
+ * ends the request so that retrying cannot multiply a full timeout.
  */
 export async function forwardWithFailover(opts: {
   backends: ModelBackend[];
@@ -166,6 +168,7 @@ export async function forwardWithFailover(opts: {
     init: Omit<RequestInit, "signal">;
   };
   timeoutMs: number;
+  streamResponse?: boolean;
 }): Promise<ForwardOutcome> {
   let lastHttpError: Extract<ForwardOutcome, { kind: "http_error" }> | null =
     null;
@@ -173,39 +176,49 @@ export async function forwardWithFailover(opts: {
   for (const backend of opts.backends) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs);
+    let response: Response | undefined;
 
-    let response: Response;
     try {
       const { url, init } = opts.buildRequest(backend);
       response = await fetch(url, { ...init, signal: controller.signal });
+      if (response.ok && opts.streamResponse) {
+        return { kind: "stream", response, backend };
+      }
+
+      const buffered = {
+        text: await response.text(),
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+      };
+      if (response.ok) {
+        return { kind: "ok", ...buffered, backend };
+      }
+
+      const httpError = { kind: "http_error" as const, ...buffered };
+      if (!isFailoverEligibleStatus(response.status)) return httpError;
+
+      console.error(
+        `[proxy] Backend ${backend.backendUrl} returned ${response.status}, trying next`,
+      );
+      lastHttpError = httpError;
     } catch (err: unknown) {
-      clearTimeout(timeoutId);
-      if (err instanceof Error && err.name === "AbortError") {
+      if (
+        controller.signal.aborted || (err instanceof Error && err.name === "AbortError")
+      ) {
         return { kind: "timeout" };
       }
-      console.error(`[proxy] Backend unreachable: ${backend.backendUrl}`, err);
-      continue;
+      console.error(`[proxy] Backend connection failed: ${backend.backendUrl}`, err);
+      if (response && !response.ok && !isFailoverEligibleStatus(response.status)) {
+        return {
+          kind: "http_error",
+          status: response.status,
+          contentType: response.headers.get("content-type"),
+          text: "",
+        };
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
-      return { kind: "ok", response, backend };
-    }
-
-    const text = await response.text();
-    const httpError = {
-      kind: "http_error" as const,
-      text,
-      status: response.status,
-      contentType: response.headers.get("content-type"),
-    };
-    if (!isFailoverEligibleStatus(response.status)) {
-      return httpError;
-    }
-    console.error(
-      `[proxy] Backend ${backend.backendUrl} returned ${response.status}, trying next`,
-    );
-    lastHttpError = httpError;
   }
 
   return lastHttpError ?? { kind: "network_error" };

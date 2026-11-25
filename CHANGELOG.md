@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Gateway timeouts now cover the full non-streaming upstream response. If the upstream disconnects during a successful response, the Gateway can retry with another backend before sending anything to the client.
 - Removed the admin-login link from the user login page to avoid confusing ordinary users. Administrators can still sign in at `/admin/login`.
 - Group request, Token and per-minute limits are now shared across members for each group-authorized model. Personal budgets are enforced independently, and the admin user detail page distinguishes personal limits from shared group limits. Requests rejected by quota checks do not consume any per-minute budget.
 - The user dashboard shows authorized models, status and personal usage without displaying quota limits, access windows or shared group usage. Its API no longer returns quota configuration.

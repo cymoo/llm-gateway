@@ -284,6 +284,7 @@ export async function handleAnthropicProxy(
   const outcome = await forwardWithFailover({
     backends,
     timeoutMs: timeout,
+    streamResponse: isStream,
     buildRequest: (backend) => {
       let backendUrlBase = backend.backendUrl.replace(/\/$/, "");
       // The backend URL typically includes /v1 (same as OpenAI base URL).
@@ -322,7 +323,7 @@ export async function handleAnthropicProxy(
     if (normalizedError) {
       return normalizedError;
     }
-    return new Response(outcome.text, {
+    return new Response(outcome.text || null, {
       status: outcome.status,
       headers: {
         "Content-Type": outcome.contentType || "application/json",
@@ -330,9 +331,8 @@ export async function handleAnthropicProxy(
     });
   }
 
-  const backendResponse = outcome.response;
-
-  if (isStream) {
+  if (outcome.kind === "stream") {
+    const backendResponse = outcome.response;
     if (!backendResponse.body) {
       return makeAnthropicError(
         "Backend returned empty response",
@@ -377,7 +377,7 @@ export async function handleAnthropicProxy(
     });
   } else {
     // Non-streaming response
-    const responseText = await backendResponse.text();
+    const responseText = outcome.text;
     const durationMs = Date.now() - startTime;
 
     let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -409,11 +409,10 @@ export async function handleAnthropicProxy(
       clientIp,
     } as UsageRecord);
 
-    return new Response(responseText, {
-      status: backendResponse.status,
+    return new Response(responseText || null, {
+      status: outcome.status,
       headers: {
-        "Content-Type":
-          backendResponse.headers.get("content-type") || "application/json",
+        "Content-Type": outcome.contentType || "application/json",
       },
     });
   }

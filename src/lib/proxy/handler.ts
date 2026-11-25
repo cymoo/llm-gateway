@@ -322,6 +322,7 @@ export async function handleProxy(
   const outcome = await forwardWithFailover({
     backends,
     timeoutMs: timeout,
+    streamResponse: isStream,
     buildRequest: (backend) => {
       const headers: Record<string, string> = {};
       if (backend.backendApiKey) {
@@ -368,7 +369,7 @@ export async function handleProxy(
     if (normalizedError) {
       return normalizedError;
     }
-    return new Response(outcome.text, {
+    return new Response(outcome.text || null, {
       status: outcome.status,
       headers: {
         "Content-Type": outcome.contentType || "application/json",
@@ -376,9 +377,8 @@ export async function handleProxy(
     });
   }
 
-  const backendResponse = outcome.response;
-
-  if (isStream) {
+  if (outcome.kind === "stream") {
+    const backendResponse = outcome.response;
     // Stream response
     if (!backendResponse.body) {
       return makeProxyError(
@@ -425,7 +425,7 @@ export async function handleProxy(
     });
   } else {
     // Non-streaming response
-    const responseText = await backendResponse.text();
+    const responseText = outcome.text;
     const durationMs = Date.now() - startTime;
 
     let usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
@@ -449,18 +449,17 @@ export async function handleProxy(
       ...usage,
       isStream: false,
       durationMs,
-      status: backendResponse.ok ? "success" : "error",
+      status: "success",
       backendId: outcome.backend.id,
       backendUrl: outcome.backend.backendUrl,
       promptPreview,
       clientIp,
     });
 
-    return new Response(responseText, {
-      status: backendResponse.status,
+    return new Response(responseText || null, {
+      status: outcome.status,
       headers: {
-        "Content-Type":
-          backendResponse.headers.get("content-type") || "application/json",
+        "Content-Type": outcome.contentType || "application/json",
       },
     });
   }
