@@ -167,6 +167,31 @@ describe("POST /api/v1/audio/transcriptions", () => {
     expect(await response.text()).toBe("hello");
   });
 
+  it("uses a fallback after an upstream disconnects during the transcript", async () => {
+    const backup = { ...audioBackend, id: "backend-2", backendUrl: "http://backup/v1" };
+    setupDb(chatQueue(audioModel, [audioBackend, backup]));
+    const truncated = new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"text":"partial'));
+      },
+      pull(controller) {
+        controller.error(new TypeError("terminated"));
+      },
+    }));
+    fetchMock
+      .mockResolvedValueOnce(truncated)
+      .mockResolvedValueOnce(Response.json({ text: "complete" }));
+
+    const response = await transcribe(request(form()));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ text: "complete" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(mockRecordUsage).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ backendId: "backend-2", requestType: "audio.transcriptions" }),
+    );
+  });
+
   it("rejects invalid uploads before forwarding", async () => {
     const empty = form();
     empty.set("file", new File([], "empty.wav"));

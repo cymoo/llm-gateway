@@ -207,10 +207,11 @@ describe("forwardWithFailover", () => {
       backends: [b1, b2],
       buildRequest,
       timeoutMs: 1000,
+      streamResponse: true,
     });
 
-    expect(outcome.kind).toBe("ok");
-    if (outcome.kind === "ok") {
+    expect(outcome.kind).toBe("stream");
+    if (outcome.kind === "stream") {
       expect(outcome.response.bodyUsed).toBe(false);
       expect(await outcome.response.text()).toBe("data: chunk\n\n");
     }
@@ -247,6 +248,49 @@ describe("forwardWithFailover", () => {
     });
 
     expect(outcome.kind).toBe("timeout");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves a non-retryable status when its error body is interrupted", async () => {
+    const brokenBody = new ReadableStream({
+      pull(controller) {
+        controller.error(new TypeError("terminated"));
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(brokenBody, { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const outcome = await forwardWithFailover({
+      backends: [b1, b2],
+      buildRequest,
+      timeoutMs: 1000,
+    });
+
+    expect(outcome).toMatchObject({ kind: "http_error", status: 400, text: "" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("times out when the backend sends headers but stalls the response body", async () => {
+    const fetchMock = vi.fn(async (_url: string, { signal }: RequestInit) => {
+      return new Response(new ReadableStream({
+        start(controller) {
+          const finish = setTimeout(() => controller.close(), 100);
+          signal?.addEventListener("abort", () => {
+            clearTimeout(finish);
+            controller.error(signal.reason);
+          }, { once: true });
+        },
+      }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const outcome = await forwardWithFailover({
+      backends: [b1, b2],
+      buildRequest,
+      timeoutMs: 10,
+    });
+
+    expect(outcome).toEqual({ kind: "timeout" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
