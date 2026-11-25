@@ -9,7 +9,7 @@ const {
   mockOrderBy,
 } = vi.hoisted(() => {
   const orderBy = vi.fn();
-  const where = vi.fn(() => ({ orderBy }));
+  const where = vi.fn<(condition: unknown) => { orderBy: typeof orderBy }>(() => ({ orderBy }));
   const leftJoin = vi.fn(() => ({ leftJoin, where }));
   const from = vi.fn(() => ({ leftJoin }));
   const select = vi.fn(() => ({ from }));

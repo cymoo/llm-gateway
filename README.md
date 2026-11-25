@@ -9,7 +9,7 @@ An LLM gateway built with **Next.js 16**, **Drizzle ORM**, and **PostgreSQL**.
 
 ## Features
 
-- Unified OpenAI-compatible proxy endpoints — `chat.completions`, `completions`, `embeddings`, and `rerank`
+- Unified OpenAI-compatible proxy endpoints for chat, completions, embeddings, reranking, and audio transcription
 - Anthropic-compatible Messages and Models API endpoints
 - Multiple upstream backends per model with cache-affinity load balancing and automatic failover
 - Public self-registration (`/register`) with admin approval workflow
@@ -134,7 +134,7 @@ If an admin user already exists (`is_admin=true`), no duplicate admin will be cr
 
 ## Backend Usage Observability
 
-The admin Request Logs tab at `/admin/usage?tab=logs` records and displays the final upstream backend for every successful request. For cache-affinity traffic, compare independent conversations rather than turns within one conversation: the same conversation is intentionally pinned to one backend. Embedding and rerank requests use round-robin routing.
+The admin Request Logs tab at `/admin/usage?tab=logs` records and displays the final upstream backend for every successful request. For cache-affinity traffic, compare independent conversations rather than turns within one conversation: the same conversation is intentionally pinned to one backend. Embeddings, reranking, and audio transcription use round-robin routing.
 
 The Backend filter applies to both the paginated log table and CSV exports. Each record stores backend ID and URL snapshots, so it remains attributable after the configured backend changes. Logs created before version 0.5.0 show no backend value.
 
@@ -143,6 +143,22 @@ After upgrading to 0.5.0, apply migration `0008_last_ted_forrester.sql`:
 ```bash
 npm run migrate
 ```
+
+## Audio transcription
+
+Start a vLLM server with the audio dependencies installed and verify it directly by uploading a short spoken WAV to `/v1/audio/transcriptions`. See the [vLLM speech-to-text guide](https://docs.vllm.ai/en/v0.27.1/serving/online_serving/speech_to_text/) and the [local Qwen3-ASR Docker example](README-zh.md#音频转写).
+
+In the admin console, create an **Audio transcription** model with alias `qwen3-asr`, backend base URL `http://127.0.0.1:8000/v1` when the Gateway runs on the same host, and backend model `Qwen/Qwen3-ASR-1.7B`. Use a base URL reachable from the Gateway if it runs in a container or on a different host. Set the backend API key if the upstream requires one, use **Test Connection**, and grant the model to the caller or their group.
+
+```bash
+curl --fail-with-body http://localhost:3000/api/v1/audio/transcriptions \
+  -H "Authorization: Bearer $GATEWAY_API_KEY" \
+  -F 'model=qwen3-asr' \
+  -F 'file=@sample.wav' \
+  -F 'response_format=json'
+```
+
+Use `http://localhost:3000/api/v1` as the OpenAI SDK base URL. Uploads are limited to a 25 MiB audio file and a 26 MiB multipart body. Responses are non-streaming, and supported output formats depend on the upstream model. Transcriptions count toward request quotas. vLLM's duration-only usage is returned to the client and contributes zero tokens to Gateway quotas.
 
 ## Anthropic-compatible API
 

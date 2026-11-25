@@ -250,8 +250,9 @@ const zh: Translations = {
     typeChat: "对话 / 补全",
     typeEmbedding: "向量（Embedding）",
     typeRerank: "重排序（Rerank）",
+    typeAudio: "音频转写",
     typeHint:
-      "对话类型服务 /chat/completions 与 /completions；向量类型服务 /embeddings；重排序类型服务 /rerank。",
+      "对话类型对应 /chat/completions 和 /completions，向量类型对应 /embeddings，重排序类型对应 /rerank，音频类型对应 /audio/transcriptions。",
     backendApiKey: "后端 API 密钥",
     backendApiKeyOptional: "（可选）",
     remarkOptional: "（可选）",

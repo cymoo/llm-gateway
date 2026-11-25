@@ -11,7 +11,7 @@ import {
   backendsPayload,
   type ModelForm,
   type BackendForm,
-} from "../new/page";
+} from "../model-form";
 import { useLanguage } from "@/lib/i18n";
 
 export default function ModelDetailPage() {

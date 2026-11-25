@@ -257,8 +257,9 @@ const en = {
     typeChat: "Chat / Completions",
     typeEmbedding: "Embedding",
     typeRerank: "Rerank",
+    typeAudio: "Audio transcription",
     typeHint:
-      "Chat serves /chat/completions and /completions; embedding serves /embeddings; rerank serves /rerank.",
+      "Chat serves /chat/completions and /completions. Embedding serves /embeddings. Rerank serves /rerank. Audio serves /audio/transcriptions.",
     backendApiKey: "Backend API Key",
     backendApiKeyOptional: "(optional)",
     remarkOptional: "(optional)",

@@ -133,7 +133,7 @@ CREATE TABLE users (
 CREATE TABLE models (
     id                              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     alias                           VARCHAR(100) UNIQUE NOT NULL,   -- 用户可见的模型名
-    type                            VARCHAR(20) NOT NULL DEFAULT 'chat', -- 'chat' | 'embedding' | 'rerank'
+    type                            VARCHAR(20) NOT NULL DEFAULT 'chat', -- 'chat' | 'embedding' | 'rerank' | 'audio'
     is_active                       BOOLEAN DEFAULT true,
 
     -- 默认限额模板（新用户授权时自动继承）
@@ -152,7 +152,7 @@ CREATE TABLE models (
 -- 同一模型部署在多台 vLLM 服务器上时，在同一别名下挂多行后端。
 -- 代理层做负载均衡：chat/completions 按对话前缀哈希做缓存亲和路由
 --（同一对话固定落在同一台后端，命中 vLLM 前缀缓存），
--- embeddings/rerank 轮询；后端连接失败或返回 5xx/429 时自动切换下一台。
+-- embeddings、rerank 与音频转写轮询；后端连接失败或返回 5xx/429 时自动切换下一台。
 CREATE TABLE model_backends (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     model_id        UUID NOT NULL REFERENCES models(id) ON DELETE CASCADE,
@@ -199,7 +199,7 @@ CREATE TABLE usage_logs (
     -- SET NULL：删除用户后用量记录以匿名形式保留，历史统计保持准确
     user_id             UUID REFERENCES users(id) ON DELETE SET NULL,
     model_id            UUID REFERENCES models(id),
-    request_type        VARCHAR(50) NOT NULL,     -- chat.completions | completions | embeddings | rerank
+    request_type        VARCHAR(50) NOT NULL,     -- chat.completions | completions | embeddings | rerank | audio.transcriptions
     prompt_tokens       INT DEFAULT 0,
     completion_tokens   INT DEFAULT 0,
     total_tokens        INT DEFAULT 0,
@@ -289,6 +289,7 @@ ADMIN_PASSWORD=your-secure-password
 | `POST` | `/api/v1/chat/completions` | Chat Completions（支持 stream、tools；仅 `type=chat` 的模型） |
 | `POST` | `/api/v1/completions` | Completions（支持 stream；仅 `type=chat` 的模型） |
 | `POST` | `/api/v1/embeddings` | Embeddings（向量嵌入；仅 `type=embedding` 的模型） |
+| `POST` | `/api/v1/audio/transcriptions` | 音频转写（multipart 上传，非流式；仅 `type=audio` 的模型） |
 | `GET` | `/api/v1/models` | 返回当前用户被授权的模型列表 |
 | `GET` | `/api/v1/models/{model}` | 返回单个模型详情 |
 | `GET` | `/api/health` | 健康检查（无需认证） |
@@ -853,6 +854,7 @@ sk-<32位随机十六进制字符>
 
 - chat 模型：`POST <backend_url>/chat/completions`，body `{model, messages:[{role:"user",content:"ping"}], max_tokens:1}`
 - embedding 模型：`POST <backend_url>/embeddings`，body `{model, input:"ping"}`
+- audio 模型使用 `POST <backend_url>/audio/transcriptions`，表单包含 `model` 和一段 16 kHz 的静音 WAV 文件。
 
 超时默认 15 秒（`MODEL_TEST_TIMEOUT_MS` 可调）。失败时会带上后端返回的状态码与响应片段，
 便于定位错误的模型名 / 密钥 / URL。（注意：embedding 后端常不提供 `GET /models`，旧的

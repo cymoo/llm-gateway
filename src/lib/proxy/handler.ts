@@ -12,6 +12,7 @@ import { makeProxyError, normalizeBackendError } from "./errors";
 import { checkQuota } from "@/lib/quota/checker";
 import { recordUsage } from "@/lib/usage/recorder";
 import { createStreamTransformer } from "./stream";
+import { AUDIO_TRANSCRIPTIONS_PATH, parseAudioTranscriptionForm } from "./audio";
 import {
   affinityKey,
   forwardWithFailover,
@@ -27,7 +28,11 @@ const PROXY_TIMEOUT_STREAM = parseInt(
 );
 
 export type RequestType =
-  "chat.completions" | "completions" | "embeddings" | "rerank";
+  | "chat.completions"
+  | "completions"
+  | "embeddings"
+  | "rerank"
+  | "audio.transcriptions";
 
 // Model `type` required by each request endpoint. The endpoint and the model's
 // declared type must match; rows without an explicit type default to "chat".
@@ -36,6 +41,7 @@ const REQUEST_TYPE_TO_MODEL_TYPE: Record<RequestType, string> = {
   completions: "chat",
   embeddings: "embedding",
   rerank: "rerank",
+  "audio.transcriptions": "audio",
 };
 
 // Upstream path segment appended to the model's backendUrl per request type.
@@ -44,6 +50,7 @@ const SUFFIX: Record<RequestType, string> = {
   completions: "completions",
   embeddings: "embeddings",
   rerank: "rerank",
+  "audio.transcriptions": AUDIO_TRANSCRIPTIONS_PATH,
 };
 
 // Request types that are always non-streaming: any client-sent streaming
@@ -105,22 +112,34 @@ export async function handleProxy(
     : undefined;
 
   // 2. Parse request body
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return makeProxyError(
-      "Invalid JSON body",
-      "server_error",
-      "backend_unavailable",
-      400,
-    );
+  let body: Record<string, unknown> = {};
+  let audioForm: FormData | null = null;
+  let modelAlias: string | undefined;
+  if (requestType === "audio.transcriptions") {
+    const result = await parseAudioTranscriptionForm(req);
+    if (result instanceof Response) return result;
+    audioForm = result;
+    const aliases = audioForm.getAll("model");
+    if (aliases.length === 1 && typeof aliases[0] === "string") {
+      modelAlias = aliases[0].trim();
+    }
+  } else {
+    try {
+      body = await req.json();
+    } catch {
+      return makeProxyError(
+        "Invalid JSON body",
+        "server_error",
+        "backend_unavailable",
+        400,
+      );
+    }
+    modelAlias = body.model as string;
   }
 
-  const modelAlias = body.model as string;
   if (!modelAlias) {
     return makeProxyError(
-      "Missing model field in request body",
+      audioForm ? "Expected one model alias" : "Missing model field in request body",
       "not_found_error",
       "model_not_found",
       400,
@@ -142,7 +161,7 @@ export async function handleProxy(
     if (typeof query === "string") {
       promptPreview = query;
     }
-  } else {
+  } else if (!audioForm) {
     const messages = body.messages as
       Array<{ role?: string; content?: string }> | undefined;
     if (Array.isArray(messages)) {
@@ -180,10 +199,7 @@ export async function handleProxy(
 
   const model = modelRows[0];
 
-  // Enforce endpoint <-> model type: each endpoint requires a model of the
-  // matching type (embeddings -> "embedding", rerank -> "rerank", chat and
-  // completions -> "chat"). Rows without an explicit type (legacy data / test
-  // mocks) default to "chat".
+  // Rows without an explicit type default to chat.
   const expectedType = REQUEST_TYPE_TO_MODEL_TYPE[requestType];
   if ((model.type ?? "chat") !== expectedType) {
     return makeProxyError(
@@ -270,10 +286,10 @@ export async function handleProxy(
   // `stream: true` so the response is proxied as JSON and token usage is
   // accounted correctly.
   const isStream =
-    !NON_STREAMING_TYPES.has(requestType) && body.stream === true;
+    !audioForm && !NON_STREAMING_TYPES.has(requestType) && body.stream === true;
   const timeout = isStream ? PROXY_TIMEOUT_STREAM : PROXY_TIMEOUT_NON_STREAM;
 
-  // Body minus the model field; each backend sets its own backend_model.
+  // Prepare JSON streaming controls before selecting the backend.
   const backendBodyBase: Record<string, unknown> = { ...body };
   if (NON_STREAMING_TYPES.has(requestType)) {
     // Non-streaming endpoints never forward streaming controls, even if the
@@ -306,22 +322,29 @@ export async function handleProxy(
   const outcome = await forwardWithFailover({
     backends,
     timeoutMs: timeout,
-    buildRequest: (backend) => ({
-      url: `${backend.backendUrl.replace(/\/$/, "")}/${SUFFIX[requestType]}`,
-      init: {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(backend.backendApiKey
-            ? { Authorization: `Bearer ${backend.backendApiKey}` }
-            : {}),
-        },
-        body: JSON.stringify({
-          ...backendBodyBase,
-          model: backend.backendModel,
-        }),
-      },
-    }),
+    buildRequest: (backend) => {
+      const headers: Record<string, string> = {};
+      if (backend.backendApiKey) {
+        headers.Authorization = `Bearer ${backend.backendApiKey}`;
+      }
+
+      let upstreamBody: string | FormData;
+      if (audioForm) {
+        // Each attempt gets its own model field and multipart boundary.
+        const form = new FormData();
+        for (const [name, value] of audioForm) form.append(name, value);
+        form.set("model", backend.backendModel);
+        upstreamBody = form;
+      } else {
+        headers["Content-Type"] = "application/json";
+        upstreamBody = JSON.stringify({ ...backendBodyBase, model: backend.backendModel });
+      }
+
+      return {
+        url: `${backend.backendUrl.replace(/\/$/, "")}/${SUFFIX[requestType]}`,
+        init: { method: "POST", headers, body: upstreamBody },
+      };
+    },
   });
 
   if (outcome.kind === "timeout") {
